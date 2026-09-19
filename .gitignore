@@ -14,3 +14,6 @@ build/
 
 # Marimo session state. Notebook sources stay tracked.
 __marimo__/
+
+# Original TLC reference snapshots staged for later RustFS publication.
+/data/reference/
