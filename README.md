@@ -9,7 +9,8 @@ a dashboard, and a fare prediction service.
 The repository contains exercise scaffolding, a pinned Scala toolchain with
 local Spark smoke tests, and Docker Compose configuration for RustFS and a Spark
 cluster. Application code and the end-to-end pipeline are not implemented yet.
-Python tooling and Marimo setup remain outstanding within M1.1.
+Independent UV projects provide pinned Python development tools and a verified
+Marimo smoke notebook. M1.1 development toolchain checks are complete.
 
 ## Project Structure
 
@@ -54,9 +55,22 @@ The RustFS console is at <http://localhost:9001> and the Spark master UI is at
 <http://localhost:8080>. RustFS uses `rustfsadmin` for both the development access
 key and secret key. Its S3 API is exposed on port `9000`.
 
-Python components in exercises 4 and 5 must use **UV**. Once a component has a
-`pyproject.toml`, run `uv sync` and `uv run <script.py>` from its directory.
-Use **Marimo** for exploratory notebooks.
+Python components in exercises 4 and 5 use **CPython 3.14.7** managed by
+**UV 0.12.17**. Each project owns its environment and committed lockfile.
+Follow the [Python toolchain setup](docs/python-toolchain.md) to install the
+tools, verify the runtime, and open the dashboard's **Marimo** smoke notebook.
+
+Run inside either Python project:
+
+```bash
+uv python install 3.14.7
+uv sync --locked
+uv run --locked pytest
+uv run --locked flake8 .
+```
+
+These checks require no Docker services or taxi data. Application dependencies
+will be added with the dashboard and prediction features.
 
 Stop the infrastructure while retaining the RustFS data volume:
 

@@ -1,0 +1,4 @@
+[flake8]
+indent-size = 4
+max-line-length = 79
+extend-exclude = .venv,__pycache__,.pytest_cache,__marimo__,build

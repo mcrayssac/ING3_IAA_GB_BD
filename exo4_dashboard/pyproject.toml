@@ -1,0 +1,23 @@
+[project]
+name = "nyc-taxi-dashboard"
+version = "0.1.0"
+description = "Dashboard and exploratory notebooks for NYC taxi data."
+readme = "README.md"
+requires-python = ">=3.14.7,<3.15"
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "flake8==7.3.0",
+    "marimo==0.24.2",
+    "pytest==9.1.1",
+]
+
+[tool.uv]
+# Scripts and notebooks run directly, without building a distribution.
+package = false
+required-version = "==0.12.17"
+python-preference = "only-managed"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
