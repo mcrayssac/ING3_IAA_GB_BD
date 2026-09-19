@@ -19,6 +19,13 @@ Marimo smoke notebook. M1.1 development toolchain checks are complete.
 See the [assignment specification](docs/instructions/instructions.pdf) and
 [course instructions](docs/instructions/README.md) for requirements and submission details.
 
+## Architecture
+
+[![Pipeline architecture showing retrieval into the RustFS data lake, one Spark ingestion job with a cleaned Parquet branch and a PostgreSQL warehouse branch, the dashboard, and the fare prediction service.](docs/diagrams/architecture.svg)](docs/architecture.md)
+
+See the [architecture document](docs/architecture.md) for component responsibilities,
+interfaces, configuration, and design decisions.
+
 ## Data Source
 
 The base dataset is the [NYC Taxi and Limousine Commission (TLC) Trip Record Data](https://www.nyc.gov/site/tlc/about/tlc-trip-record-data.page).
