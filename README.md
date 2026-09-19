@@ -11,6 +11,8 @@ local Spark smoke tests, and Docker Compose configuration for RustFS and a Spark
 cluster. Application code and the end-to-end pipeline are not implemented yet.
 Independent UV projects provide pinned Python development tools and a verified
 Marimo smoke notebook. M1.1 development toolchain checks are complete.
+M2.1 source identification is complete. The dictionary and zone lookup are
+staged locally, with RustFS publication pending M2.3 after M1.3 verification.
 
 ## Project Structure
 
@@ -32,6 +34,10 @@ The base dataset is the [NYC Taxi and Limousine Commission (TLC) Trip Record Dat
 TLC publishes monthly Parquet files and provides data dictionaries and taxi zone
 lookup tables on that page. The project will use yellow taxi trip records for
 **May, June, and July 2026**.
+
+See the [source catalog](docs/data-sources.md) for verified monthly URLs and
+reported sizes, dictionary definitions, zone lookup details, and reference
+snapshot checksums and destinations.
 
 ## Setup
 

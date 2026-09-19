@@ -42,7 +42,7 @@ exo2 branch 2 -> exo4 dashboard
 |---|---|---|---|---|
 | TLC trip record data | External source of monthly trip files, data dictionary, and zone lookup | Controlled by the project | HTTPS download | M2.1 |
 | `exo1_data_retrieval` | Retrieve the selected months and store them unchanged in `nyc_raw/` | Validation, cleaning, schema changes | Scala, Hadoop S3A | M2.2–M2.4 |
-| RustFS | Data lake storing raw and cleaned files | Business logic | S3-compatible object storage | M1.3 |
+| RustFS | Data lake storing raw files, cleaned files, and reference snapshots | Business logic | S3-compatible object storage | M1.3 |
 | Spark cluster | Execute the Spark jobs in the cluster profile | Storage | Spark 4.2.0, one master, two workers | M1.3 |
 | `exo2_data_ingestion` | Validate raw data once, then run branch 1 and branch 2 in one job | Creating warehouse tables | Scala, Spark SQL, JDBC | M3.2, M3.3, M4.3 |
 | `exo3_sql_olap` | Define the dimensional model, its tables, constraints, reference data, and analytical queries | Loading trip data | PostgreSQL SQL | M4.1, M4.2, M4.4 |
@@ -57,7 +57,7 @@ this table accurate. Consumers depend only on what the interface states.
 
 | ID | Producer to consumer | Contract | Owner |
 |---|---|---|---|
-| I1 | TLC to `exo1` | Monthly trip files named `yellow_tripdata_YYYY-MM.parquet`. The owner records the source URLs, the data dictionary, and the zone lookup file. | M2.1 |
+| I1 | TLC to `exo1` | May, June, and July 2026 files named `yellow_tripdata_YYYY-MM.parquet`. The [source catalog](data-sources.md) records verified URLs, reported sizes, the dictionary, and the zone lookup. | M2.1 |
 | I2 | `exo1` to local disk | Local staging directory `data/raw/` at the repository root. Files keep their source names and content and are not versioned in Git. | M2.2 |
 | I3 | `exo1` to RustFS | Bucket `nyc-taxi`. Trip files at `s3a://nyc-taxi/nyc_raw/yellow_tripdata_YYYY-MM.parquet`, identical to the source. Later stages must not modify them. | M2.3, M2.4 |
 | I4 | RustFS to `exo2` | `exo2` reads the `nyc_raw/` objects of the requested months. | M3.2 |
@@ -67,6 +67,7 @@ this table accurate. Consumers depend only on what the interface states.
 | I8 | PostgreSQL to `exo4` | Read-only access to `dw` with the connection settings below. Analytical queries are stored in `exo3_sql_olap/`. | M5.2 (connection), M4.4 (queries) |
 | I9 | RustFS to `exo4` and `exo5` | Read-only access to `nyc_cleaned/` following the I5 contract. | M5.1, M6.1 |
 | I10 | `exo5` training to inference | Training saves the model artifact in `exo5_ml_prediction_service/models/`. The inference script loads it from there. | M6.3 |
+| I11 | Reference staging to RustFS | Original dictionary PDF and zone CSV staged at `data/reference/tlc/<snapshot-id>/`, then published unchanged to `s3a://nyc-taxi/nyc_reference/tlc/<snapshot-id>/` with source filenames. The catalog identifies the snapshot and SHA-256 checksums. Publication is pending. | M2.1 (inventory), M2.3 (publication) |
 
 ## Configuration
 
@@ -116,13 +117,14 @@ M2.4 and the full reproduction in M8.1. Each owner task implements them, and M8.
 | D7 | Shared environment variable names across components | Local runs, cluster runs, and optional orchestration in M7.1 use the same configuration. |
 | D8 | Each Python component is its own UV project | The exercise READMEs require UV for any Python component. |
 | D9 | The model artifact lives in `exo5_ml_prediction_service/models/` | Training and inference are separate scripts that exchange a saved model, as required by the assignment and M6.3. |
+| D10 | Dictionary and zone lookup snapshots live in `nyc_reference/tlc/<snapshot-id>/` in the RustFS bucket `nyc-taxi`. Snapshot IDs use UTC `YYYYMMDDTHHMMSSZ`. | Timestamped, unchanged references preserve provenance for contract design and warehouse reference data. Updates create new snapshots. Local staging is ignored by Git. |
 
 ## Open Points
 
 These points belong to later tasks and are not resolved here.
 
 - **M1.3** adds the PostgreSQL service with the values above and verifies S3A access from the Spark containers.
-- **M2.1** confirms that the May, June, and July 2026 files are published and chooses where the zone lookup is stored.
+- **M2.3** publishes the [verified reference snapshot](data-sources.md#reference-snapshot) after M1.3 verifies RustFS. The snapshot is currently staged locally only.
 - **M2.4** defines how `exo1` runs in the cluster profile. **M3.2** and **M4.3** do the same for `exo2` and its JDBC driver.
 - **M3.1** defines the cleaned data contract, including partitioning, time handling, and whether rejected records are kept.
 - **M4.1** chooses a star, snowflake, or constellation model and justifies it in the report.

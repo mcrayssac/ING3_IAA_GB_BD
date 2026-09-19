@@ -36,8 +36,14 @@ complete the architecture work in M1.2 or infrastructure checks in M1.3.
 |---|---|---|
 | M2.1 | Identify the three monthly files, dictionaries, and lookup data | None |
 | M2.2 | Implement local retrieval of the selected Parquet files | M1.1, M2.1 |
-| M2.3 | Upload local files to RustFS and verify availability | M2.2, M1.3 |
+| M2.3 | Upload local trip files and reference snapshots to RustFS and verify availability | M2.2, M1.3 |
 | M2.4 | Automate direct retrieval into RustFS with repeatable execution | M2.3 |
+
+M2.1 source identification is complete. The [source catalog](data-sources.md)
+records successful availability checks for all three monthly files and verified
+local snapshots of the dictionary and zone lookup. Monthly downloads remain
+M2.2 work. Reference snapshot publication remains M2.3 work after M1.3 verifies
+RustFS. The local reference files are ignored by Git.
 
 ### M3. Data Validation and Cleaning — Exercise 2, Branch 1
 
