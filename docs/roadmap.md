@@ -24,6 +24,10 @@ The tasks below provide a basis for allocation between both collaborators. Each 
 | M1.2 | Define architecture, component responsibilities, and interfaces | None |
 | M1.3 | Prepare and verify RustFS, Spark, and PostgreSQL | M1.1, M1.2 |
 
+The Scala portion of M1.1 provides a [shared terminal toolchain and local smoke tests](scala-toolchain.md).
+UV and Marimo setup remain outstanding. Local Spark smoke tests do not complete
+the infrastructure checks in M1.3.
+
 ### M2. Data Retrieval — Exercise 1
 
 | ID | Task / expected output | Depends on |
