@@ -6,9 +6,11 @@ a dashboard, and a fare prediction service.
 
 ## Current Status
 
-The repository contains exercise scaffolding, Scala build definitions, and
-Docker Compose configuration for RustFS and a Spark cluster. Application code
-and tests have not been implemented yet. The end-to-end pipeline is not available.
+The repository contains exercise scaffolding, a pinned Scala toolchain with
+local Spark smoke tests, and Docker Compose configuration for RustFS and a Spark
+cluster. Application code and the end-to-end pipeline are not implemented yet.
+Independent UV projects provide pinned Python development tools and a verified
+Marimo smoke notebook. M1.1 development toolchain checks are complete.
 
 ## Project Structure
 
@@ -26,11 +28,23 @@ lookup tables on that page. The project will use yellow taxi trip records for
 
 ## Setup
 
-Install Docker with Docker Compose, sbt, and a Java JDK compatible with the
-configured Spark version. Both Scala modules currently declare Scala **2.13.17**
-and Apache Spark **4.2.0**.
+Both Scala modules use **JDK 21 LTS**, **sbt 2.0.9**, **Scala 2.13.18**,
+and **Apache Spark 4.2.0**. Follow the [Scala toolchain setup](docs/scala-toolchain.md)
+to select `JAVA_HOME`, install the sbt runner, and verify the actual runtime.
 
-From the repository root, start the infrastructure:
+Build and test each module independently from the repository root:
+
+```bash
+(cd exo1_data_retrieval && sbt --batch 'compile; testFull; shutdown')
+(cd exo2_data_ingestion && sbt --batch 'compile; testFull; shutdown')
+```
+
+Each module uses ScalaTest **3.2.19** to start Spark with `local[2]`, count ten
+generated rows, and stop Spark. These checks require no Docker services or taxi
+data. `testFull` executes all tests even after a previous successful run.
+
+For infrastructure work, install Docker with Docker Compose and run from the
+repository root:
 
 ```bash
 docker compose up -d
@@ -41,18 +55,22 @@ The RustFS console is at <http://localhost:9001> and the Spark master UI is at
 <http://localhost:8080>. RustFS uses `rustfsadmin` for both the development access
 key and secret key. Its S3 API is exposed on port `9000`.
 
-Build each Scala module independently:
+Python components in exercises 4 and 5 use **CPython 3.14.7** managed by
+**UV 0.12.17**. Each project owns its environment and committed lockfile.
+Follow the [Python toolchain setup](docs/python-toolchain.md) to install the
+tools, verify the runtime, and open the dashboard's **Marimo** smoke notebook.
+
+Run inside either Python project:
 
 ```bash
-(cd exo1_data_retrieval && sbt compile && sbt test)
-(cd exo2_data_ingestion && sbt compile && sbt test)
+uv python install 3.14.7
+uv sync --locked
+uv run --locked pytest
+uv run --locked flake8 .
 ```
 
-The `sbt test` commands currently have no test cases to run.
-
-Python components in exercises 4 and 5 must use **UV**. Once a component has a
-`pyproject.toml`, run `uv sync` and `uv run <script.py>` from its directory.
-Use **Marimo** for exploratory notebooks.
+These checks require no Docker services or taxi data. Application dependencies
+will be added with the dashboard and prediction features.
 
 Stop the infrastructure while retaining the RustFS data volume:
 

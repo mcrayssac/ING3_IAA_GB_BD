@@ -24,6 +24,12 @@ The tasks below provide a basis for allocation between both collaborators. Each 
 | M1.2 | Define architecture, component responsibilities, and interfaces | None |
 | M1.3 | Prepare and verify RustFS, Spark, and PostgreSQL | M1.1, M1.2 |
 
+M1.1 is complete. The [Scala toolchain](scala-toolchain.md) and
+[Python toolchain](python-toolchain.md) provide pinned terminal workflows and
+verified smoke checks, including Marimo execution. Python checks also pass in
+fresh environments without changing either lockfile. These local checks do not
+complete the architecture work in M1.2 or infrastructure checks in M1.3.
+
 ### M2. Data Retrieval — Exercise 1
 
 | ID | Task / expected output | Depends on |
