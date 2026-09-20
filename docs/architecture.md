@@ -92,8 +92,9 @@ Docker Compose network.
 
 The Spark JDBC URL is `jdbc:postgresql://${PG_HOST}:${PG_PORT}/${PG_DATABASE}`.
 A dashboard tool that does not read environment variables uses the same connection values.
-The RustFS credentials are the development values of the local stack. `PG_PASSWORD` is set
-in the local environment and is never committed. Its provisioning is defined in M1.3.
+The RustFS credentials are the development values of the local stack. `PG_PASSWORD` is read
+from `.env`, which each collaborator creates from the committed `.env.example` and never
+commits. Docker Compose refuses to start when it is unset.
 
 ## Design Requirements
 
@@ -123,7 +124,6 @@ M2.4 and the full reproduction in M8.1. Each owner task implements them, and M8.
 
 These points belong to later tasks and are not resolved here.
 
-- **M1.3** adds the PostgreSQL service with the values above and verifies S3A access from the Spark containers.
 - **M2.3** publishes the [verified reference snapshot](data-sources.md#reference-snapshot) after M1.3 verifies RustFS. The snapshot is currently staged locally only.
 - **M2.4** defines how `exo1` runs in the cluster profile. **M3.2** and **M4.3** do the same for `exo2` and its JDBC driver.
 - **M3.1** defines the cleaned data contract, including partitioning, time handling, and whether rejected records are kept.

@@ -7,12 +7,13 @@ a dashboard, and a fare prediction service.
 ## Current Status
 
 The repository contains exercise scaffolding, a pinned Scala toolchain with
-local Spark smoke tests, and Docker Compose configuration for RustFS and a Spark
-cluster. Application code and the end-to-end pipeline are not implemented yet.
-Independent UV projects provide pinned Python development tools and a verified
-Marimo smoke notebook. M1.1 development toolchain checks are complete.
-M2.1 source identification is complete. The dictionary and zone lookup are
-staged locally, with RustFS publication pending M2.3 after M1.3 verification.
+local Spark smoke tests, and a verified Docker Compose stack running RustFS,
+PostgreSQL, and a Spark cluster. Application code and the end-to-end pipeline are
+not implemented yet. Independent UV projects provide pinned Python development
+tools and a verified Marimo smoke notebook. M1.1 development toolchain checks and
+M1.3 infrastructure checks are complete. M2.1 source identification is complete.
+The dictionary and zone lookup are staged locally, with RustFS publication
+pending M2.3.
 
 ## Project Structure
 
@@ -56,17 +57,27 @@ Each module uses ScalaTest **3.2.19** to start Spark with `local[2]`, count ten
 generated rows, and stop Spark. These checks require no Docker services or taxi
 data. `testFull` executes all tests even after a previous successful run.
 
-For infrastructure work, install Docker with Docker Compose and run from the
-repository root:
+For infrastructure work, install Docker with Docker Compose. Copy the committed
+template to `.env` and set `PG_PASSWORD`. Compose refuses to start without it, and
+`.env` is never committed. Run from the repository root:
 
 ```bash
+cp .env.example .env
 docker compose up -d
 ```
 
-The configuration defines RustFS, one Spark master, and two Spark workers.
-The RustFS console is at <http://localhost:9001> and the Spark master UI is at
-<http://localhost:8080>. RustFS uses `rustfsadmin` for both the development access
-key and secret key. Its S3 API is exposed on port `9000`.
+The configuration defines RustFS, PostgreSQL, one Spark master, and two Spark
+workers with 2 cores and 2g each. The RustFS console is at <http://localhost:9001>
+and the Spark master UI is at <http://localhost:8080>, with the worker UIs on
+`8081` and `8082`. RustFS uses `rustfsadmin` for both the development access key
+and secret key. Its S3 API is exposed on port `9000`. PostgreSQL serves the
+`nyc_taxi` database on port `5432`.
+
+The containers receive the cluster profile of the
+[configuration table](docs/architecture.md#configuration): `http://rustfs:9000`,
+`spark://spark-master:7077`, and the `postgres` host. Tools running on the host
+keep the local profile values from `.env`. The Spark containers mount
+`spark-defaults.conf`, which configures S3A access to RustFS.
 
 Python components in exercises 4 and 5 use **CPython 3.14.7** managed by
 **UV 0.12.17**. Each project owns its environment and committed lockfile.
@@ -85,7 +96,7 @@ uv run --locked flake8 .
 These checks require no Docker services or taxi data. Application dependencies
 will be added with the dashboard and prediction features.
 
-Stop the infrastructure while retaining the RustFS data volume:
+Stop the infrastructure while retaining the RustFS and PostgreSQL data volumes:
 
 ```bash
 docker compose down

@@ -27,8 +27,13 @@ The tasks below provide a basis for allocation between both collaborators. Each 
 M1.1 is complete. The [Scala toolchain](scala-toolchain.md) and
 [Python toolchain](python-toolchain.md) provide pinned terminal workflows and
 verified smoke checks, including Marimo execution. Python checks also pass in
-fresh environments without changing either lockfile. These local checks do not
-complete the architecture work in M1.2 or infrastructure checks in M1.3.
+fresh environments without changing either lockfile.
+
+M1.3 is complete. Docker Compose starts RustFS, PostgreSQL, one Spark master, and
+two workers that register with 2 cores and 2g each. The Spark containers resolve
+`rustfs` and `postgres`, and a Spark job reads and writes `s3a://nyc-taxi/`
+through the mounted `spark-defaults.conf`. Creating the bucket itself stays part
+of interface I3 and belongs to M2.3.
 
 ### M2. Data Retrieval — Exercise 1
 
