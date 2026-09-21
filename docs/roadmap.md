@@ -1,6 +1,6 @@
 # Project Roadmap
 
-[![Detailed project Gantt showing 26 tasks across M1–M8 and illustrative dependency steps 00–10. M1 and tasks M1.1, M1.2, M1.3, and M2.1 are complete. M2.2, M3.1, and M4.1 are ready to start. Optional extensions and three transversal activities remain on the roadmap.](diagrams/roadmap-gantt.svg)](diagrams/roadmap-gantt.svg)
+[![Detailed project Gantt showing 26 tasks across M1–M8 and illustrative dependency steps 00–10. M1 and tasks M1.1, M1.2, M1.3, M2.1, and M2.2 are complete. M2.3, M3.1, and M4.1 are ready to start. Optional extensions and three transversal activities remain on the roadmap.](diagrams/roadmap-gantt.svg)](diagrams/roadmap-gantt.svg)
 
 [Editable Excalidraw source](diagrams/roadmap-gantt.excalidraw).
 
@@ -15,10 +15,11 @@ Build a reproducible pipeline using yellow taxi records for **May, June, and Jul
 The tasks below provide a basis for allocation between both collaborators. Each task has a stable ID, an expected output, and explicit prerequisites. A prerequisite's accepted output must be available before the dependent task can be completed. Planned dates, effort estimates, and owners remain unset.
 
 Status as of **21 September 2026**: **M1 is complete**, and M2.1 source
-identification is complete. **M2.2, M3.1, and M4.1 are ready to start** because
-their prerequisites are complete. Ready does not mean implementation has begun.
-Completion and readiness labels in the Gantt record this status without changing
-its dependency steps. Other tasks remain uncompleted.
+identification and M2.2 local retrieval are complete. **M2.3, M3.1, and M4.1
+are ready to start** because their prerequisites are complete. Ready does not
+mean implementation has begun. Completion and readiness labels in the Gantt
+record this status without changing its dependency steps. Other tasks remain
+uncompleted.
 
 ## Milestones
 
@@ -72,9 +73,13 @@ M2.3 work. Warehouse tables and Spark JDBC integration belong to later tasks.
 
 M2.1 source identification is complete. The [source catalog](data-sources.md)
 records successful availability checks for all three monthly files and verified
-local snapshots of the dictionary and zone lookup. **M2.2 is ready to start**.
-Monthly downloads remain M2.2 work, and reference snapshot publication remains
-M2.3 work. The local reference files are ignored by Git.
+local snapshots of the dictionary and zone lookup.
+
+M2.2 is complete. The `exo1_data_retrieval` job downloads the May, June, and
+July 2026 monthly Parquet files into `data/raw`, skipping files that are already
+present. **M2.3 is ready to start**. Uploading the trip files and publishing the
+reference snapshots to RustFS remain M2.3 work. The local raw and reference
+files are ignored by Git.
 
 ### M3. Data Validation and Cleaning — Exercise 2, Branch 1
 
