@@ -7,13 +7,15 @@ a dashboard, and a fare prediction service.
 ## Current Status
 
 The repository contains exercise scaffolding, a pinned Scala toolchain with
-local Spark smoke tests, and a verified Docker Compose stack running RustFS,
-PostgreSQL, and a Spark cluster. Application code and the end-to-end pipeline are
-not implemented yet. Independent UV projects provide pinned Python development
+local Spark smoke tests, a verified Docker Compose stack running RustFS,
+PostgreSQL, and a Spark cluster, and the local trip-file retrieval of exercise 1.
+The remaining application code and the end-to-end pipeline are not implemented
+yet. Independent UV projects provide pinned Python development
 tools and a verified Marimo smoke notebook. M1.1 development toolchain checks and
-M1.3 infrastructure checks are complete. M2.1 source identification is complete.
-The dictionary and zone lookup are staged locally, with RustFS publication
-pending M2.3.
+M1.3 infrastructure checks are complete. M2.1 source identification is complete,
+and M2.2 stages the three monthly trip files locally. The dictionary, the zone
+lookup, and the trip files are staged locally, with RustFS publication pending
+M2.3.
 
 ## Project Structure
 
@@ -101,6 +103,33 @@ Stop the infrastructure while retaining the RustFS and PostgreSQL data volumes:
 ```bash
 docker compose down
 ```
+
+## Data Retrieval
+
+Exercise 1 stages the monthly trip files of the
+[source catalog](docs/data-sources.md) in `data/raw` at the repository root,
+keeping their source names and bytes. A month already present is kept as is, and
+an interrupted download leaves no partial Parquet file. The staged files are not
+versioned in Git. The `retrieve` task runs from the repository root and
+downloads about 190 MB on a first run:
+
+```bash
+(cd exo1_data_retrieval && sbt --batch 'retrieve; shutdown')
+```
+
+It defaults to the three catalog months and `data/raw`, which `TAXI_MONTHS` and
+`RAW_DIR`, or two task arguments, override:
+
+```bash
+(cd exo1_data_retrieval && sbt --batch 'retrieve 2026-05 data/raw; shutdown')
+```
+
+The task replaces `sbt run`, which fails on sbt **2.0.9** with
+`ClassNotFoundException` because the forked run keeps the `${OUT}` and
+`${CSR_CACHE}` classpath placeholders unresolved. Compilation and tests are
+unaffected.
+
+Uploading the staged files to RustFS is M2.3 work.
 
 ## Roadmap
 
