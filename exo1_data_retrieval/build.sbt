@@ -2,6 +2,8 @@ version := "0.1.0-SNAPSHOT"
 
 scalaVersion := "2.13.18"
 
+val retrieve = inputKey[Unit]("Stage the requested months in the local raw directory.")
+
 lazy val root = (project in file("."))
   .settings(
     name := "ex01_data_retrieval",
@@ -11,6 +13,22 @@ lazy val root = (project in file("."))
       "org.apache.spark" %% "spark-hadoop-cloud" % "4.2.0",
       "org.scalatest" %% "scalatest" % "3.2.19" % Test
     ),
+    // sbt 2.0.9 forks `run` with unresolved ${OUT} and ${CSR_CACHE} classpath
+    // entries, so the retrieval task resolves them through the file converter.
+    // It runs from the repository root, where RAW_DIR defaults to data/raw.
+    retrieve := {
+      val requested = sbt.complete.DefaultParsers.spaceDelimited("<months> <rawDir>").parsed
+      val converter = fileConverter.value
+      val classpath = (Compile / fullClasspath).value
+        .map(entry => converter.toPath(entry.data).toAbsolutePath.toString)
+        .mkString(java.io.File.pathSeparator)
+      val options = ForkOptions()
+        .withJavaHome(javaHome.value)
+        .withWorkingDirectory(baseDirectory.value.getParentFile)
+      val arguments = Seq("-cp", classpath, "fr.cytech.integration.Main") ++ requested
+      val exitCode = Fork.java(options, arguments)
+      if (exitCode != 0) sys.error(s"Retrieval failed with exit code $exitCode")
+    },
     // Keep the test JVM on the JDK selected for sbt through JAVA_HOME.
     javaHome := Some(file(sys.props("java.home"))),
     Test / fork := true,
