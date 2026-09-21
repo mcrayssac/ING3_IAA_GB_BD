@@ -1,6 +1,6 @@
 # Project Roadmap
 
-[![Detailed project Gantt showing 26 tasks across M1–M8, illustrative dependency steps 00–10, optional extensions, and three transversal activities.](diagrams/roadmap-gantt.svg)](diagrams/roadmap-gantt.svg)
+[![Detailed project Gantt showing 26 tasks across M1–M8 and illustrative dependency steps 00–10. M1 and tasks M1.1, M1.2, M1.3, and M2.1 are complete. M2.2, M3.1, and M4.1 are ready to start. Optional extensions and three transversal activities remain on the roadmap.](diagrams/roadmap-gantt.svg)](diagrams/roadmap-gantt.svg)
 
 [Editable Excalidraw source](diagrams/roadmap-gantt.excalidraw).
 
@@ -12,28 +12,54 @@ T1 and T2 span foundations through completion of final acceptance in M8.1. T3 co
 
 Build a reproducible pipeline using yellow taxi records for **May, June, and July 2026**.
 
-The tasks below provide a basis for allocation between both collaborators. Each task has a stable ID, an expected output, and explicit prerequisites. A prerequisite's accepted output must be available before the dependent task can be completed. Dates, effort estimates, and owners remain unset.
+The tasks below provide a basis for allocation between both collaborators. Each task has a stable ID, an expected output, and explicit prerequisites. A prerequisite's accepted output must be available before the dependent task can be completed. Planned dates, effort estimates, and owners remain unset.
+
+Status as of **21 September 2026**: **M1 is complete**, and M2.1 source
+identification is complete. **M2.2, M3.1, and M4.1 are ready to start** because
+their prerequisites are complete. Ready does not mean implementation has begun.
+Completion and readiness labels in the Gantt record this status without changing
+its dependency steps. Other tasks remain uncompleted.
 
 ## Milestones
 
-### M1. Project Foundations
+### M1. Project Foundations — Complete
 
-| ID | Task / expected output | Depends on |
-|---|---|---|
-| M1.1 | Establish development tools and verify Scala, UV, and Marimo setup | None |
-| M1.2 | Define architecture, component responsibilities, and interfaces | None |
-| M1.3 | Prepare and verify RustFS, Spark, and PostgreSQL | M1.1, M1.2 |
+| ID | Task / expected output | Depends on | Status |
+|---|---|---|---|
+| M1.1 | Establish development tools and verify Scala, UV, and Marimo setup | None | Complete |
+| M1.2 | Define architecture, component responsibilities, and interfaces | None | Complete |
+| M1.3 | Prepare and verify RustFS, Spark, and PostgreSQL | M1.1, M1.2 | Complete |
 
 M1.1 is complete. The [Scala toolchain](scala-toolchain.md) and
 [Python toolchain](python-toolchain.md) provide pinned terminal workflows and
 verified smoke checks, including Marimo execution. Python checks also pass in
 fresh environments without changing either lockfile.
 
-M1.3 is complete. Docker Compose starts RustFS, PostgreSQL, one Spark master, and
-two workers that register with 2 cores and 2g each. The Spark containers resolve
-`rustfs` and `postgres`, and a Spark job reads and writes `s3a://nyc-taxi/`
-through the mounted `spark-defaults.conf`. Creating the bucket itself stays part
-of interface I3 and belongs to M2.3.
+M1.2 is complete. The [architecture](architecture.md) defines component
+responsibilities, data flow, interfaces, configuration, and design decisions.
+
+M1.3 was verified locally on **21 September 2026**, using Docker Desktop with
+Docker Engine **29.7.2** on macOS ARM64 with Linux containers. The tested versions were
+PostgreSQL **18.6**, RustFS **1.0.0**, Spark **4.2.0**, Scala **2.13.18**, and
+Java **21.0.11** inside the Spark containers.
+
+- PostgreSQL accepted the configured password, rejected an incorrect password,
+  and retained a disposable record across a container restart.
+- Two Spark workers registered with 2 cores and 2 GB each. The master and both
+  workers resolved and connected to RustFS, PostgreSQL, and the Spark master.
+- A job on `spark://spark-master:7077` used the mounted `spark-defaults.conf` to
+  write and read Parquet through S3A in a temporary `m1-smoke-<unique-id>` bucket.
+  It returned **10 rows with a sum of 45**. The test bucket, objects, and database
+  fixture were removed afterward.
+
+All five project services were running at the end of verification. A temporary
+Compose override changed only this project's RustFS container name to avoid a
+collision with an unrelated stopped container. The `rustfs` service name and
+network endpoint stayed unchanged. Credentials were kept in an ignored local
+`.env` with owner-only permissions.
+
+Creating the production `nyc-taxi` bucket and publishing source files remain
+M2.3 work. Warehouse tables and Spark JDBC integration belong to later tasks.
 
 ### M2. Data Retrieval — Exercise 1
 
@@ -46,9 +72,9 @@ of interface I3 and belongs to M2.3.
 
 M2.1 source identification is complete. The [source catalog](data-sources.md)
 records successful availability checks for all three monthly files and verified
-local snapshots of the dictionary and zone lookup. Monthly downloads remain
-M2.2 work. Reference snapshot publication remains M2.3 work after M1.3 verifies
-RustFS. The local reference files are ignored by Git.
+local snapshots of the dictionary and zone lookup. **M2.2 is ready to start**.
+Monthly downloads remain M2.2 work, and reference snapshot publication remains
+M2.3 work. The local reference files are ignored by Git.
 
 ### M3. Data Validation and Cleaning — Exercise 2, Branch 1
 
@@ -58,7 +84,7 @@ RustFS. The local reference files are ignored by Git.
 | M3.2 | Implement shared validation and cleaning in Spark | M3.1, M2.3 |
 | M3.3 | Publish cleaned historical Parquet files for prediction | M3.2 |
 
-M3.1 and M3.2 establish validation shared by both ingestion branches. M3.3 writes the cleaned historical files to RustFS for branch 1.
+**M3.1 is ready to start**. M3.1 and M3.2 establish validation shared by both ingestion branches. M3.3 writes the cleaned historical files to RustFS for branch 1.
 
 ### M4. Warehouse and SQL Analytics — Exercises 3 and 2, Branch 2
 
@@ -69,7 +95,7 @@ M3.1 and M3.2 establish validation shared by both ingestion branches. M3.3 write
 | M4.3 | Implement warehouse ingestion from the shared validated data | M4.2, M3.2 |
 | M4.4 | Implement analytical SQL queries and expected results | M4.3 |
 
-M4.2 provides `creation.sql` and `insertion.sql`. M4.3 applies warehouse transformations in memory within the shared Spark job, after the schema is available.
+**M4.1 is ready to start**. M4.2 provides `creation.sql` and `insertion.sql`. M4.3 applies warehouse transformations in memory within the shared Spark job, after the schema is available.
 
 ### M5. Dashboard — Exercise 4
 
