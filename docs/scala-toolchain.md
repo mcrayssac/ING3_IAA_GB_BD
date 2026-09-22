@@ -80,13 +80,14 @@ sbt --batch 'testFull; shutdown'
 ```
 
 The first command resolves dependencies, compiles the project and test sources,
-and executes `ToolchainSpec`. Application sources remain empty at this stage.
-The second command proves the test passes again from a fresh sbt process.
+and executes all tests, including `ToolchainSpec`. The retrieval module also
+tests its [local download workflow](../exo1_data_retrieval/README.md) with small
+HTTP and Parquet fixtures. The second command repeats tests from a fresh sbt process.
 Use `testFull` for acceptance because sbt 2's `test` can skip successful tests.
 
 The test checks the runtime Java, Scala, and Spark versions, starts Spark with
-`local[2]`, counts ten generated rows, and stops Spark in `finally`. Each run
-must report one successful test and print the actual runtime versions.
+`local[2]`, counts ten generated rows, and stops Spark in `finally`. Each module
+must report a successful toolchain test and print the actual runtime versions.
 
 Tests use a forked JVM with a 1 GB heap and the JDK 21 module access options from
 [Spark's launcher](https://github.com/apache/spark/blob/v4.2.0/launcher/src/main/java/org/apache/spark/launcher/JavaModuleOptions.java).
@@ -117,7 +118,7 @@ and cluster deployment have not been exercised by this verification run.
 - **Local socket restrictions:** Spark needs local driver and executor sockets
   even with `local[2]`. Run the check in an environment allowing loopback sockets.
 - **No tests executed:** use `testFull` and confirm the output reports
-  `ToolchainSpec`, one test, and a successful result.
+  `ToolchainSpec` and a successful result. The retrieval module has additional tests.
 
 Generated sbt output and build server metadata are ignored by Git. These checks
 verify the local development toolchain. Cluster deployment, storage connections,

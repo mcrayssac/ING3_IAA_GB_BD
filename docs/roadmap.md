@@ -14,7 +14,7 @@ Build a reproducible pipeline using yellow taxi records for **May, June, and Jul
 
 The tasks below provide a basis for allocation between both collaborators. Each task has a stable ID, an expected output, and explicit prerequisites. A prerequisite's accepted output must be available before the dependent task can be completed. Planned dates, effort estimates, and owners remain unset.
 
-Status as of **21 September 2026**: **M1 is complete**, and M2.1 source
+Status as of **22 September 2026**: **M1 is complete**, and M2.1 source
 identification and M2.2 local retrieval are complete. **M2.3, M3.1, and M4.1
 are ready to start** because their prerequisites are complete. Ready does not
 mean implementation has begun. Completion and readiness labels in the Gantt
@@ -75,11 +75,25 @@ M2.1 source identification is complete. The [source catalog](data-sources.md)
 records successful availability checks for all three monthly files and verified
 local snapshots of the dictionary and zone lookup.
 
-M2.2 is complete. The `exo1_data_retrieval` job downloads the May, June, and
-July 2026 monthly Parquet files into `data/raw`, skipping files that are already
-present. **M2.3 is ready to start**. Uploading the trip files and publishing the
-reference snapshots to RustFS remain M2.3 work. The local raw and reference
-files are ignored by Git.
+**M2.2 is complete.** The [local retrieval command](../exo1_data_retrieval/README.md)
+downloaded and fully decoded all three files on **21 September 2026** using
+Spark **4.2.0** with `local[2]`, Scala **2.13.18**, JDK **21.0.12**, and sbt
+**2.0.9** on macOS ARM64. It verified 4,090,836 May rows, 3,837,248 June rows,
+and 3,530,109 July rows. The source catalog records actual bytes, SHA-256,
+retrieval times, schemas, and the additional `request_source` column in June
+and July. No cleaning or schema harmonization was performed.
+
+The upgrade was verified on **22 September 2026**. All **20 Scala tests** passed
+twice in fresh sbt processes, covering HTTP failure, retry, timeout, interruption,
+corrupt-column, reuse, refresh, and positional command validation. Both
+`retrieve` and `runMain` fully reread the accepted files using `local[2]` without
+downloading them again. Independent checksum checks confirmed unchanged
+Parquet files and sidecars, including modification times. Existing downloads
+without matching metadata require explicit refresh.
+
+**M2.3 is ready to start.** Publishing trip files and reference snapshots,
+including production bucket creation, remains M2.3 work. All local staging
+files remain ignored by Git. Other operating systems have not been tested.
 
 ### M3. Data Validation and Cleaning — Exercise 2, Branch 1
 

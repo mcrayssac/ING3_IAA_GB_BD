@@ -13,9 +13,9 @@ The remaining application code and the end-to-end pipeline are not implemented
 yet. Independent UV projects provide pinned Python development
 tools and a verified Marimo smoke notebook. M1.1 development toolchain checks and
 M1.3 infrastructure checks are complete. M2.1 source identification is complete,
-and M2.2 stages the three monthly trip files locally. The dictionary, the zone
-lookup, and the trip files are staged locally, with RustFS publication pending
-M2.3.
+and M2.2 stages and fully verifies the three monthly trip files locally. The
+dictionary, the zone lookup, and the trip files are staged locally, with RustFS
+publication pending M2.3.
 
 ## Project Structure
 
@@ -39,8 +39,8 @@ lookup tables on that page. The project will use yellow taxi trip records for
 **May, June, and July 2026**.
 
 See the [source catalog](docs/data-sources.md) for verified monthly URLs and
-reported sizes, dictionary definitions, zone lookup details, and reference
-snapshot checksums and destinations.
+actual sizes, checksums, row counts, and schemas, plus dictionary definitions,
+zone lookup details, and reference snapshot checksums and destinations.
 
 ## Setup
 
@@ -106,30 +106,28 @@ docker compose down
 
 ## Data Retrieval
 
-Exercise 1 stages the monthly trip files of the
-[source catalog](docs/data-sources.md) in `data/raw` at the repository root,
-keeping their source names and bytes. A month already present is kept as is, and
-an interrupted download leaves no partial Parquet file. The staged files are not
-versioned in Git. The `retrieve` task runs from the repository root and
-downloads about 190 MB on a first run:
+Exercise 1 stages the three monthly files in repository-root `data/raw/`,
+retaining source names and bytes. Each download receives a complete local Spark
+read and a JSON provenance sidecar. Existing files require matching metadata,
+size, and SHA-256 before another full read. Staging files are ignored by Git.
+
+After selecting JDK 21, run from the repository root:
 
 ```bash
 (cd exo1_data_retrieval && sbt --batch 'retrieve; shutdown')
 ```
 
-It defaults to the three catalog months and `data/raw`, which `TAXI_MONTHS` and
-`RAW_DIR`, or two task arguments, override:
+`TAXI_MONTHS` and `RAW_DIR` override the defaults. Optional positional arguments
+have priority over these environment variables:
 
 ```bash
 (cd exo1_data_retrieval && sbt --batch 'retrieve 2026-05 data/raw; shutdown')
 ```
 
-The task replaces `sbt run`, which fails on sbt **2.0.9** with
-`ClassNotFoundException` because the forked run keeps the `${OUT}` and
-`${CSR_CACHE}` classpath placeholders unresolved. Compilation and tests are
-unaffected.
-
-Uploading the staged files to RustFS is M2.3 work.
+See the [retrieval guide](exo1_data_retrieval/README.md) for PowerShell commands,
+local Spark configuration, explicit refresh, recovery, and verification.
+Existing downloads without sidecars require explicit refresh. RustFS publication
+remains M2.3 work.
 
 ## Roadmap
 

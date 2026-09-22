@@ -58,7 +58,7 @@ this table accurate. Consumers depend only on what the interface states.
 | ID | Producer to consumer | Contract | Owner |
 |---|---|---|---|
 | I1 | TLC to `exo1` | May, June, and July 2026 files named `yellow_tripdata_YYYY-MM.parquet`. The [source catalog](data-sources.md) records verified URLs, reported sizes, the dictionary, and the zone lookup. | M2.1 |
-| I2 | `exo1` to local disk | Local staging directory `data/raw/` at the repository root. Files keep their source names and content and are not versioned in Git. | M2.2 |
+| I2 | `exo1` to local disk | Repository-root `data/raw/`, overridable through `RAW_DIR`. Original filenames and bytes, with adjacent version 1 JSON provenance sidecars recording URLs, timestamps, size, SHA-256, schemas, row count, and verification runtimes. Downloads are promoted after a complete local Spark read. Normal reruns verify and reuse matching pairs, while explicit refresh replaces them and retains previous metadata. All staging artifacts are ignored by Git. See the [retrieval workflow](../exo1_data_retrieval/README.md). | M2.2 |
 | I3 | `exo1` to RustFS | Bucket `nyc-taxi`. Trip files at `s3a://nyc-taxi/nyc_raw/yellow_tripdata_YYYY-MM.parquet`, identical to the source. Later stages must not modify them. | M2.3, M2.4 |
 | I4 | RustFS to `exo2` | `exo2` reads the `nyc_raw/` objects of the requested months. | M3.2 |
 | I5 | `exo2` branch 1 to RustFS | Cleaned Parquet dataset at `s3a://nyc-taxi/nyc_cleaned/yellow_tripdata/`. Column names, types, and validation rules form the cleaned data contract. | M3.1 (contract), M3.3 (output) |
@@ -89,6 +89,17 @@ Docker Compose network.
 | `PG_USER` | `nyc_taxi` | same | `exo2`, `exo3`, `exo4` |
 | `PG_PASSWORD` | no default | same | `exo2`, `exo3`, `exo4` |
 | `PG_SCHEMA` | `dw` | same | `exo2`, `exo3`, `exo4` |
+
+Both M2.2 entry points use the same retrieval engine. The `retrieve` task accepts
+optional positional months and directory, overriding the process environment.
+The `runMain` entry point uses the environment only. Neither loads `.env`.
+Both accept nonempty subsets of the three catalog months and local Spark masters
+only. Both sbt launches pass the repository root as `nyctaxi.repositoryRoot`, so
+relative `RAW_DIR` values have the same meaning when launched inside the module.
+HTTP transfer, JSON provenance, Spark verification, and command orchestration
+are separate components. The JDK HTTP client downloads candidates, Spark reads
+all columns without transformations, and the provenance store promotes accepted
+file/sidecar pairs. A pending marker detects interrupted promotion.
 
 The Spark JDBC URL is `jdbc:postgresql://${PG_HOST}:${PG_PORT}/${PG_DATABASE}`.
 A dashboard tool that does not read environment variables uses the same connection values.
@@ -124,7 +135,7 @@ M2.4 and the full reproduction in M8.1. Each owner task implements them, and M8.
 
 These points belong to later tasks and are not resolved here.
 
-- **M2.3** publishes the [verified reference snapshot](data-sources.md#reference-snapshot) after M1.3 verifies RustFS. The snapshot is currently staged locally only.
+- **M2.3** publishes local trip files and the [verified reference snapshot](data-sources.md#reference-snapshot). M1.3 has verified RustFS. Publication remains pending.
 - **M2.4** defines how `exo1` runs in the cluster profile. **M3.2** and **M4.3** do the same for `exo2` and its JDBC driver.
 - **M3.1** defines the cleaned data contract, including partitioning, time handling, and whether rejected records are kept.
 - **M4.1** chooses a star, snowflake, or constellation model and justifies it in the report.
