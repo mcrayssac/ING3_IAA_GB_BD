@@ -1,89 +1,47 @@
 package fr.cytech.integration
 
-import com.sun.net.httpserver.{HttpExchange, HttpServer}
-import java.io.IOException
-import java.net.InetSocketAddress
-import java.nio.charset.StandardCharsets
-import java.nio.file.{Files, Path}
-import java.util.concurrent.atomic.AtomicInteger
+import java.nio.file.Paths
+import nyctaxi.retrieval.{LocalRetrieval, RetrievalConfig}
 import org.scalatest.funsuite.AnyFunSuite
 
-/** Covers month parsing, source naming, and local staging without touching TLC. */
+/** The positional command must have the same validation and behavior as runMain. */
 class MainSpec extends AnyFunSuite {
+  private val root = Paths.get(".").toAbsolutePath.normalize()
 
-  private val Month = "2026-05"
-  private val Payload = "PAR1-fake-trip-file".getBytes(StandardCharsets.UTF_8)
-
-  /** Serves the monthly file locally so the tests stay offline and fast. */
-  private def withServer(status: Int)(body: (String, AtomicInteger) => Unit): Unit = {
-    val requests = new AtomicInteger(0)
-    val server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0)
-    server.createContext(
-      "/trip-data",
-      (exchange: HttpExchange) => {
-        requests.incrementAndGet()
-        if (status == 200) {
-          exchange.sendResponseHeaders(200, Payload.length.toLong)
-          exchange.getResponseBody.write(Payload)
-        } else {
-          exchange.sendResponseHeaders(status, -1L)
-        }
-        exchange.close()
-      }
-    )
-    server.start()
-    try body(s"http://127.0.0.1:${server.getAddress.getPort}/trip-data", requests)
-    finally server.stop(0)
-  }
-
-  private def withStaging(body: Path => Unit): Unit = {
-    val rawDir = Files.createTempDirectory("m2-2-raw")
-    try body(rawDir)
-    finally {
-      Files.walk(rawDir).sorted(java.util.Comparator.reverseOrder()).forEach(Files.delete(_))
+  test("defaults and environment settings use the shared configuration") {
+    for (env <- Vector(Map.empty[String, String], Map("TAXI_MONTHS" -> "2026-06",
+      "RAW_DIR" -> "data/custom", "SPARK_MASTER" -> "local[2]"))) {
+      assert(Main.parse(Array.empty, env, root) == RetrievalConfig.parse(Array.empty, env, root))
     }
   }
 
-  test("month lists are parsed and invalid months are rejected") {
-    assert(RawRetrieval.parseMonths(" 2026-05, 2026-06 ,2026-07 ") ==
-      Seq("2026-05", "2026-06", "2026-07"))
-    assert(RawRetrieval.parseMonths(RawRetrieval.DefaultMonths).size == 3)
-    assertThrows[IllegalArgumentException](RawRetrieval.parseMonths(""))
-    assertThrows[IllegalArgumentException](RawRetrieval.parseMonths("2026-13"))
-    assertThrows[IllegalArgumentException](RawRetrieval.parseMonths("may-2026"))
+  test("positional values override only supplied environment settings") {
+    val env = Map("TAXI_MONTHS" -> "2026-07", "RAW_DIR" -> "data/env", "SPARK_MASTER" -> "local[2]")
+    val subset = Main.parse(Array("2026-05"), env, root)
+    assert(subset.months == Vector("2026-05") && subset.rawDir == root.resolve("data/env"))
+    val overrideBoth = Main.parse(Array("2026-06,2026-05", "data/path with spaces"), env, root)
+    assert(overrideBoth.months == Vector("2026-06", "2026-05"))
+    assert(overrideBoth.rawDir == root.resolve("data/path with spaces") && overrideBoth.master == "local[2]")
+    val absolute = root.resolve("data/absolute")
+    assert(Main.parse(Array("2026-05", absolute.toString), env, root).rawDir == absolute)
   }
 
-  test("file names and URLs follow the TLC source catalog") {
-    assert(RawRetrieval.fileName(Month) == "yellow_tripdata_2026-05.parquet")
-    assert(RawRetrieval.sourceUrl(RawRetrieval.DefaultBaseUrl, Month) ==
-      "https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2026-05.parquet")
-    assert(RawRetrieval.sourceUrl("http://host/trip-data/", Month) ==
-      "http://host/trip-data/yellow_tripdata_2026-05.parquet")
-  }
-
-  test("a month is staged unchanged and is not downloaded twice") {
-    withStaging { rawDir =>
-      withServer(200) { (baseUrl, requests) =>
-        val staged = RawRetrieval.run(Seq(Month), rawDir, baseUrl)
-        assert(staged == Seq(rawDir.resolve("yellow_tripdata_2026-05.parquet")))
-        assert(Files.readAllBytes(staged.head).sameElements(Payload))
-        assert(requests.get() == 1)
-
-        RawRetrieval.run(Seq(Month), rawDir, baseUrl)
-        assert(requests.get() == 1)
-      }
+  test("refresh accepts zero, one, or two positional arguments") {
+    for (positional <- Vector(Array.empty[String], Array("2026-05"), Array("2026-05", "data/raw"))) {
+      assert(Main.parse(positional :+ "--refresh", Map.empty, root).refresh)
+      assert(!Main.parse(positional, Map.empty, root).refresh)
     }
   }
 
-  test("a failed download leaves no file in the staging directory") {
-    withStaging { rawDir =>
-      withServer(404) { (baseUrl, _) =>
-        val failure = intercept[IOException] {
-          RawRetrieval.run(Seq(Month), rawDir, baseUrl)
-        }
-        assert(failure.getMessage.contains("404"))
-        assert(!Files.exists(rawDir.resolve("yellow_tripdata_2026-05.parquet")))
-      }
+  test("invalid arguments and configuration fail before execution") {
+    for (args <- Vector(Array("--unknown"), Array("--refresh", "2026-05"),
+      Array("--refresh", "--refresh"), Array("--help", "2026-05"),
+      Array("2026-05", "data/raw", "extra"), Array("2026-05", ""),
+      Array("2026-05,2026-05"), Array("2026-08"), Array("2026-5"), Array("2026-05,"))) {
+      intercept[IllegalArgumentException](Main.parse(args, Map.empty, root))
     }
+    intercept[IllegalArgumentException](Main.parse(Array.empty, Map("SPARK_MASTER" -> "spark://master:7077"), root))
+    assert(LocalRetrieval.execute(Main.parse(Array("--unknown"), Map.empty, root)) == 2)
+    assert(LocalRetrieval.execute(RetrievalConfig.parse(Array("--unknown"), Map.empty, root)) == 2)
   }
 }
