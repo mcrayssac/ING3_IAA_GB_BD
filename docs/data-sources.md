@@ -243,6 +243,10 @@ No geographic boundary files are selected in M2.1.
 
 ## Reference and Source Identification Verification — M2.1
 
+[![M2.1 workflow. Manual HEAD checks, reference downloads, PDF and CSV inspection, and SHA-256 recomputation produce the source catalog, the staged reference files, the bundled descriptor, and the Month and StorageLayout contract used by M2.2 and M2.3.](diagrams/m2-1-source-identification.svg)](diagrams/m2-1-source-identification.svg)
+
+[Editable Excalidraw source](diagrams/m2-1-source-identification.excalidraw).
+
 - Checked the official page for the five source links and monthly file selection.
 - Verified HTTP 200 and reported lengths for all three monthly URLs using HEAD.
 - Opened and rendered the original PDF with Poppler, confirming its title and revision.

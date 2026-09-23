@@ -4,6 +4,10 @@ M2.3 publishes verified local May–July 2026 Parquet files and reference snapsh
 `20260919T204934Z`. It preserves original bytes and filenames. It performs no
 TLC download, cleaning, schema harmonization, or warehouse loading.
 
+[![M2.3 workflow. sbt upload or runMain RustFsUpload parses the configuration, locks RAW_DIR, ensures the bucket, and publishes each source. Objects are created conditionally, re-read for SHA-256, decoded by Spark when they are Parquet, and followed by their provenance. Only a fully verified run writes a receipt.](../../docs/diagrams/m2-3-rustfs-publication.svg)](../../docs/diagrams/m2-3-rustfs-publication.svg)
+
+[Editable Excalidraw source](../../docs/diagrams/m2-3-rustfs-publication.excalidraw).
+
 ## Prerequisites and Run
 
 Select JDK 21 through `JAVA_HOME` using the [toolchain guide](../../docs/scala-toolchain.md).

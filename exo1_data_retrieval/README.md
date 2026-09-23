@@ -6,6 +6,14 @@ verification have separate responsibilities. No Docker services are needed.
 [RustFS publication](docs/publication.md) is implemented in M2.3. Direct retrieval
 into RustFS remains M2.4 work.
 
+## Workflow
+
+[![M2.2 workflow. sbt retrieve or runMain LocalRetrieval parses the configuration, locks RAW_DIR, and processes each month. Accepted files are reused after a full Spark read. Other files are downloaded with retries, fully decoded, and promoted with their provenance sidecar. Each month yields an ItemResult, and the run exits with 0, 1, 2, or 130.](../docs/diagrams/m2-2-local-retrieval.svg)](../docs/diagrams/m2-2-local-retrieval.svg)
+
+[Editable Excalidraw source](../docs/diagrams/m2-2-local-retrieval.excalidraw). The
+[M2.1 diagram](../docs/diagrams/m2-1-source-identification.svg) shows where the month
+selection, URLs, and filenames come from.
+
 ## Run
 
 Select JDK 21 through `JAVA_HOME` using the [Scala toolchain guide](../docs/scala-toolchain.md).
