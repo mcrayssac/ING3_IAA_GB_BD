@@ -1,65 +1,60 @@
 package nyctaxi.retrieval
 
 import java.net.URI
-import java.nio.channels.FileChannel
-import java.nio.file.{Files, StandardOpenOption}
-import scala.util.Using
+import java.nio.file.Files
+import nyctaxi.contract.{Month, StorageLayout}
+import nyctaxi.shared.{Interrupts, ItemResult, ParquetVerifier, Provenance, ProvenanceFiles, RawDirLock,
+  RuntimeVersions, SparkParquetVerifier}
 import scala.util.control.NonFatal
-
-final case class MonthResult(month: String, success: Boolean, message: String)
 
 /** Per-month orchestration is injectable so HTTP failure tests never depend on TLC. */
 final class RetrievalRunner(
   downloader: HttpDownload,
   verifier: ParquetVerifier,
   store: ProvenanceStore = new ProvenanceStore(),
-  source: String => URI = RetrievalConfig.source,
+  source: Month => URI = StorageLayout.tripSource,
   log: String => Unit = println
 ) {
   /** A failed month does not discard completed months or prevent the following one. */
-  def run(config: RetrievalConfig): Vector[MonthResult] = {
+  def run(config: RetrievalConfig): Vector[ItemResult] = {
     Files.createDirectories(config.rawDir)
-    // Serialize writers to this staging directory. The OS releases the lock after a crash.
-    Using.resource(FileChannel.open(config.rawDir.resolve(".retrieval.lock"),
-      StandardOpenOption.CREATE, StandardOpenOption.WRITE)) { channel =>
-      val lock = channel.tryLock()
-      require(lock != null, "Another retrieval process is using RAW_DIR")
-      try config.months.map { month =>
-        if (Thread.currentThread().isInterrupted) throw new InterruptedException("Retrieval interrupted")
+    // Serialize writers to this staging directory.
+    RawDirLock.hold(config.rawDir, "Another retrieval process is using RAW_DIR") {
+      config.months.map { month =>
+        Interrupts.check("Retrieval")
         val result = try retrieve(config, month) catch {
-          case NonFatal(error) => MonthResult(month, false, Option(error.getMessage).getOrElse(error.getClass.getSimpleName))
+          case NonFatal(error) =>
+            ItemResult(month.value, false, Option(error.getMessage).getOrElse(error.getClass.getSimpleName))
         }
-        log(s"${result.month}: ${if (result.success) "OK" else "FAILED"} ${result.message}")
+        log(s"${result.name}: ${if (result.success) "OK" else "FAILED"} ${result.message}")
         result
-      } finally lock.release()
+      }
     }
   }
 
-  private def retrieve(config: RetrievalConfig, month: String): MonthResult = {
-    val name = RetrievalConfig.filename(month)
+  private def retrieve(config: RetrievalConfig, month: Month): ItemResult = {
+    val name = StorageLayout.tripFilename(month)
     val file = config.rawDir.resolve(name)
     val url = source(month)
-    val existing = if (config.refresh) None else store.existing(file, month, url.toString)
+    val existing = if (config.refresh) None else ProvenanceFiles.existing(file, month, url.toString)
     val report = existing match {
       case Some(saved) =>
         val observed = verifier.verify(file)
-        require(observed.rowCount == saved.verification.rowCount &&
-          observed.parquetSchema == saved.verification.parquetSchema &&
-          observed.sparkSchema == saved.verification.sparkSchema, "Verification differs from recorded metadata")
+        require(observed.sameAs(saved.verification), "Verification differs from recorded metadata")
         observed
       case None =>
         val candidate = downloader.fetch(url, config.rawDir, name)
         try {
           val observed = verifier.verify(candidate.path)
-          if (Thread.currentThread().isInterrupted) throw new InterruptedException("Verification interrupted")
-          val saved = Provenance(month, name, url.toString, candidate.finalUrl, candidate.retrievedAt,
+          Interrupts.check("Verification")
+          val saved = Provenance(month.value, name, url.toString, candidate.finalUrl, candidate.retrievedAt,
             candidate.bytes, candidate.sha256, observed)
           store.publish(candidate.path, file, saved)
           observed
         } finally Files.deleteIfExists(candidate.path)
     }
     val action = if (existing.nonEmpty) "reused" else if (config.refresh) "refreshed" else "downloaded"
-    MonthResult(month, true, s"$action and fully verified $name, ${Files.size(file)} bytes, ${report.rowCount} rows")
+    ItemResult(month.value, true, s"$action and fully verified $name, ${Files.size(file)} bytes, ${report.rowCount} rows")
   }
 }
 
@@ -89,7 +84,8 @@ object LocalRetrieval {
     val verifier = new SparkParquetVerifier(config.master)
     val status = try {
       println(s"Raw directory: ${config.rawDir}")
-      println(s"Runtime: Java ${sys.props("java.version")}, Scala ${scala.util.Properties.versionNumberString}, master ${config.master}")
+      val versions = RuntimeVersions.current
+      println(s"Runtime: Java ${versions.java}, Scala ${versions.scala}, master ${config.master}")
       val results = new RetrievalRunner(downloader, verifier).run(config)
       val passed = results.count(_.success)
       println(s"Summary: $passed/${results.size} months verified, ${results.size - passed} failed")

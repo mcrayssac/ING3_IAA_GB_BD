@@ -6,6 +6,9 @@ import org.apache.hadoop.fs.{Path => HadoopPath}
 import org.apache.parquet.hadoop.ParquetFileReader
 import org.apache.parquet.hadoop.util.HadoopInputFile
 import org.apache.spark.sql.SparkSession
+import nyctaxi.contract.{Month, StorageLayout}
+import nyctaxi.shared.{Fixtures, ParquetVerifier, ProvenanceFiles, SparkParquetVerifier,
+  Verification}
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.funsuite.AnyFunSuite
 import scala.util.Using
@@ -35,14 +38,14 @@ class LocalRetrievalSpec extends AnyFunSuite with BeforeAndAfterAll {
   }
 
   private def config(directory: Path, refresh: Boolean = false): RetrievalConfig =
-    RetrievalConfig(Vector("2026-05"), directory, "local[2]", refresh)
+    RetrievalConfig(Vector(Month("2026-05")), directory, "local[2]", refresh)
 
   test("configuration resolves raw paths from the root and rejects invalid input before execution") {
     Fixtures.directory { root =>
       val defaults = RetrievalConfig.parse(Array.empty, Map.empty, root)
-      assert(defaults.rawDir == root.resolve("data/raw") && defaults.months == RetrievalConfig.selectedMonths)
+      assert(defaults.rawDir == root.resolve("data/raw") && defaults.months == Month.selected)
       val subset = RetrievalConfig.parse(Array("--refresh"), Map("TAXI_MONTHS" -> "2026-07", "SPARK_MASTER" -> "local[2]"), root)
-      assert(subset.months == Vector("2026-07") && subset.refresh)
+      assert(subset.months == Vector(Month("2026-07")) && subset.refresh)
       for (months <- Vector("", "2026-05,", "2026-05,2026-05", "2026-5", "2026-08"))
         intercept[IllegalArgumentException](RetrievalConfig.parse(Array.empty, Map("TAXI_MONTHS" -> months), root))
       for (master <- Vector("spark://spark-master:7077", "local-cluster[2,1,1024]", "local[0]", ""))
@@ -59,19 +62,19 @@ class LocalRetrievalSpec extends AnyFunSuite with BeforeAndAfterAll {
         Using.resource(new HttpDownload(policy)) { downloader =>
           val verifier = new SparkParquetVerifier("local[2]")
           val store = new ProvenanceStore()
-          val runner = new RetrievalRunner(downloader, verifier, store, month => base.resolve(month), _ => ())
-          val file = directory.resolve(RetrievalConfig.filename("2026-05"))
+          val runner = new RetrievalRunner(downloader, verifier, store, month => base.resolve(month.value), _ => ())
+          val file = directory.resolve(StorageLayout.tripFilename(Month("2026-05")))
           assert(runner.run(config(directory)).forall(_.success))
-          val original = Files.readAllBytes(store.metadata(file))
-          val saved = store.existing(file, "2026-05", base.resolve("2026-05").toString).get
+          val original = Files.readAllBytes(ProvenanceFiles.metadata(file))
+          val saved = ProvenanceFiles.existing(file, Month("2026-05"), base.resolve("2026-05").toString).get
           assert(saved.verification.rowCount == 10L && saved.verification.parquetSchema.contains("label"))
           assert(saved.verification.sparkSchema.contains("missing") && Files.readAllBytes(file).sameElements(bytes))
           assert(runner.run(config(directory)).forall(_.success) && requests.get() == 1)
-          assert(Files.readAllBytes(store.metadata(file)).sameElements(original))
+          assert(Files.readAllBytes(ProvenanceFiles.metadata(file)).sameElements(original))
           assert(runner.run(config(directory, refresh = true)).forall(_.success) && requests.get() == 2)
           val history = Fixtures.children(directory.resolve(".history").resolve(file.getFileName))
           assert(history.size == 1 && Files.readAllBytes(history.head).sameElements(original))
-          assert(!Files.exists(store.pending(file)))
+          assert(!Files.exists(ProvenanceFiles.pending(file)))
         }
       }
     }
@@ -82,14 +85,14 @@ class LocalRetrievalSpec extends AnyFunSuite with BeforeAndAfterAll {
       Fixtures.server((exchange, _) => Fixtures.respond(exchange, 200, bytes)) { (base, requests) =>
         Using.resource(new HttpDownload(policy)) { downloader =>
           val store = new ProvenanceStore()
-          val runner = new RetrievalRunner(downloader, new SparkParquetVerifier("local[2]"), store, month => base.resolve(month), _ => ())
-          val file = directory.resolve(RetrievalConfig.filename("2026-05"))
+          val runner = new RetrievalRunner(downloader, new SparkParquetVerifier("local[2]"), store, month => base.resolve(month.value), _ => ())
+          val file = directory.resolve(StorageLayout.tripFilename(Month("2026-05")))
           assert(runner.run(config(directory)).forall(_.success))
           damage match {
-            case "metadata" => Files.delete(store.metadata(file))
-            case "invalid-metadata" => Files.writeString(store.metadata(file), "{\"formatVersion\":2}")
+            case "metadata" => Files.delete(ProvenanceFiles.metadata(file))
+            case "invalid-metadata" => Files.writeString(ProvenanceFiles.metadata(file), "{\"formatVersion\":2}")
             case "bytes" => val changed = bytes.clone(); changed(10) = (changed(10) ^ 1).toByte; Files.write(file, changed)
-            case "marker" => Files.writeString(store.pending(file), "interrupted")
+            case "marker" => Files.writeString(ProvenanceFiles.pending(file), "interrupted")
             case "file" => Files.delete(file)
           }
           assert(runner.run(config(directory)).forall(!_.success) && requests.get() == 1)
@@ -105,15 +108,15 @@ class LocalRetrievalSpec extends AnyFunSuite with BeforeAndAfterAll {
       } { (base, requests) =>
         Using.resource(new HttpDownload(policy)) { downloader =>
           val store = new ProvenanceStore()
-          val runner = new RetrievalRunner(downloader, new SparkParquetVerifier("local[2]"), store, month => base.resolve(month), _ => ())
-          val file = directory.resolve(RetrievalConfig.filename("2026-05"))
+          val runner = new RetrievalRunner(downloader, new SparkParquetVerifier("local[2]"), store, month => base.resolve(month.value), _ => ())
+          val file = directory.resolve(StorageLayout.tripFilename(Month("2026-05")))
           assert(runner.run(config(directory)).forall(_.success))
-          val original = Files.readAllBytes(store.metadata(file))
-          val results = runner.run(config(directory, refresh = true).copy(months = Vector("2026-05", "2026-06")))
+          val original = Files.readAllBytes(ProvenanceFiles.metadata(file))
+          val results = runner.run(config(directory, refresh = true).copy(months = Vector(Month("2026-05"), Month("2026-06"))))
           assert(results.map(_.success) == Vector(false, true) && requests.get() == 3)
           assert(Files.readAllBytes(file).sameElements(bytes))
-          assert(Files.readAllBytes(store.metadata(file)).sameElements(original))
-          assert(!Files.exists(store.pending(file)))
+          assert(Files.readAllBytes(ProvenanceFiles.metadata(file)).sameElements(original))
+          assert(!Files.exists(ProvenanceFiles.pending(file)))
           assert(!Fixtures.children(directory).exists(_.getFileName.toString.endsWith(".part")))
         }
       }
@@ -138,13 +141,13 @@ class LocalRetrievalSpec extends AnyFunSuite with BeforeAndAfterAll {
       Fixtures.server((exchange, number) => Fixtures.respond(exchange, if (number == 1) 200 else 503, bytes)) { (base, _) =>
         Using.resource(new HttpDownload(policy)) { downloader =>
           val store = new ProvenanceStore()
-          val runner = new RetrievalRunner(downloader, new SparkParquetVerifier("local[2]"), store, month => base.resolve(month), _ => ())
-          val file = directory.resolve(RetrievalConfig.filename("2026-05"))
+          val runner = new RetrievalRunner(downloader, new SparkParquetVerifier("local[2]"), store, month => base.resolve(month.value), _ => ())
+          val file = directory.resolve(StorageLayout.tripFilename(Month("2026-05")))
           assert(runner.run(config(directory)).forall(_.success))
-          val original = Files.readAllBytes(store.metadata(file))
+          val original = Files.readAllBytes(ProvenanceFiles.metadata(file))
           assert(runner.run(config(directory, refresh = true)).forall(!_.success))
           assert(Files.readAllBytes(file).sameElements(bytes))
-          assert(Files.readAllBytes(store.metadata(file)).sameElements(original))
+          assert(Files.readAllBytes(ProvenanceFiles.metadata(file)).sameElements(original))
         }
       }
     }
@@ -157,8 +160,8 @@ class LocalRetrievalSpec extends AnyFunSuite with BeforeAndAfterAll {
           val interrupted = new ParquetVerifier {
             override def verify(path: Path): Verification = throw new InterruptedException("cancelled")
           }
-          val runner = new RetrievalRunner(downloader, interrupted, source = month => base.resolve(month), log = _ => ())
-          intercept[InterruptedException](runner.run(config(directory).copy(months = RetrievalConfig.selectedMonths)))
+          val runner = new RetrievalRunner(downloader, interrupted, source = month => base.resolve(month.value), log = _ => ())
+          intercept[InterruptedException](runner.run(config(directory).copy(months = Month.selected)))
           assert(requests.get() == 1)
           assert(Fixtures.children(directory).forall(_.getFileName.toString == ".retrieval.lock"))
         }

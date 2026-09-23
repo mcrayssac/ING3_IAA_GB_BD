@@ -4,7 +4,9 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import java.io.{ByteArrayInputStream, ByteArrayOutputStream, InputStream}
 import java.nio.file.{Files, Path}
 import java.time.{Duration, Instant}
-import nyctaxi.retrieval.{Fixtures, Provenance, ProvenanceStore, RetrievalConfig, SparkParquetVerifier, Verification}
+import nyctaxi.contract.{Month, StorageKey, StorageLayout}
+import nyctaxi.shared.{Digest, Fixtures, Provenance, ProvenanceCodec, ProvenanceFiles, SparkParquetVerifier,
+  Verification}
 import org.apache.spark.sql.SparkSession
 import scala.collection.mutable
 
@@ -28,13 +30,15 @@ object PublicationFixtures {
     } finally { verifier.close(); spark.stop() }
   }
 
+  /** Writes accepted file/sidecar pairs directly, as retrieval would have promoted them. */
   def stage(root: Path, bytes: Array[Byte], report: Verification): PublicationInputs = {
     val raw = Files.createDirectories(root.resolve("raw"))
-    RetrievalConfig.selectedMonths.foreach { month =>
-      val candidate = Files.write(raw.resolve(s"$month.part"), bytes)
-      new ProvenanceStore().publish(candidate, raw.resolve(RetrievalConfig.filename(month)),
-        Provenance(month, RetrievalConfig.filename(month), RetrievalConfig.source(month).toString,
-          RetrievalConfig.source(month).toString, Instant.now().toString, bytes.length, Payload.digest(bytes), report))
+    Month.selected.foreach { month =>
+      val file = Files.write(raw.resolve(StorageLayout.tripFilename(month)), bytes)
+      val source = StorageLayout.tripSource(month).toString
+      Files.write(ProvenanceFiles.metadata(file), ProvenanceCodec.toBytes(Provenance(month.value,
+        StorageLayout.tripFilename(month), source, source, Instant.now().toString, bytes.length,
+        Digest.sha256(bytes), report)))
     }
     val mapper = new ObjectMapper()
     val descriptor = mapper.readTree(PublicationInputs.descriptor)
@@ -44,25 +48,27 @@ object PublicationFixtures {
       val node = files.get(i).asInstanceOf[com.fasterxml.jackson.databind.node.ObjectNode]
       val content = s"reference fixture $i".getBytes(java.nio.charset.StandardCharsets.UTF_8)
       Files.write(refs.resolve(node.path("filename").asText()), content)
-      node.put("bytes", content.length).put("sha256", Payload.digest(content))
+      node.put("bytes", content.length).put("sha256", Digest.sha256(content))
     }
     new PublicationInputs(mapper.writeValueAsBytes(descriptor))
   }
 
+  /** In-memory bucket keyed by plain strings so assertions stay readable. */
   class MemoryStore extends ObjectStore {
     val entries: mutable.Map[String, Array[Byte]] = mutable.Map.empty
     val writes: mutable.ArrayBuffer[String] = mutable.ArrayBuffer.empty
     var aborts = 0
     override def ensureBucket(): Unit = ()
-    override def stat(key: String): Option[ObjectInfo] = synchronized { entries.get(key).map(b => ObjectInfo(b.length, 1L)) }
-    override def open(key: String): InputStream = synchronized { new ByteArrayInputStream(entries(key)) }
-    override def create(key: String): ObjectWrite = new ObjectWrite {
+    override def stat(key: StorageKey): Option[ObjectInfo] =
+      synchronized { entries.get(key.value).map(b => ObjectInfo(b.length, 1L)) }
+    override def open(key: StorageKey): InputStream = synchronized { new ByteArrayInputStream(entries(key.value)) }
+    override def create(key: StorageKey): ObjectWrite = new ObjectWrite {
       private val buffer = new ByteArrayOutputStream()
       override def output: ByteArrayOutputStream = buffer
       override def commit(): Unit = MemoryStore.this.synchronized {
-        if (entries.contains(key)) throw new java.nio.file.FileAlreadyExistsException(key)
-        entries(key) = buffer.toByteArray
-        writes += key
+        if (entries.contains(key.value)) throw new java.nio.file.FileAlreadyExistsException(key.value)
+        entries(key.value) = buffer.toByteArray
+        writes += key.value
       }
       override def abort(): Unit = MemoryStore.this.synchronized { aborts += 1 }
     }

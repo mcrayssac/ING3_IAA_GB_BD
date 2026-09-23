@@ -1,15 +1,23 @@
 package nyctaxi.publication
 
-import java.io.{IOException, InputStream, OutputStream}
+import java.io.IOException
 import java.nio.file.AccessDeniedException
-import java.security.MessageDigest
 import java.time.Duration
-import java.util.concurrent.{Callable, CountDownLatch, ExecutionException, Executors, TimeUnit, TimeoutException}
+import java.util.concurrent.{Callable, CountDownLatch, ExecutionException, Executors, TimeUnit,
+  TimeoutException}
+import nyctaxi.shared.Retry
 import software.amazon.awssdk.core.exception.SdkClientException
 import software.amazon.awssdk.awscore.exception.AwsServiceException
 import scala.collection.mutable.ArrayBuffer
 import scala.util.control.NonFatal
 
+/** Deadlines, cancellation, and retries of storage operations (interfaces I3 and I11, task M2.3).
+  *
+  * Input: one storage operation that registers its open resources with an `OperationScope`.
+  * Output: the operation's result, with at most `attempts` tries for transient failures.
+  * Failure: access denial becomes `StorageAccessFailure` immediately. Conflicts and invalid input are never
+  *   retried. A timed-out operation that does not stop throws `UnstoppedOperation`.
+  */
 final case class StoragePolicy(
   connectTimeout: Duration = Duration.ofSeconds(30), operationTimeout: Duration = Duration.ofMinutes(5),
   attempts: Int = 3, backoffMillis: Long = 1000L
@@ -17,14 +25,16 @@ final case class StoragePolicy(
 
 final class PublicationConflict(message: String) extends IllegalStateException(message)
 final class StorageAccessFailure extends IOException("Storage authentication or access denied")
-private final class UnstoppedOperation extends IllegalStateException("Timed-out storage operation did not stop safely")
+private final class UnstoppedOperation
+  extends IllegalStateException("Timed-out storage operation did not stop safely")
 
 /** Cancellation closes active resources before a retry can start. */
 final class OperationScope {
   private var cancelled = false
   private val cleanup = ArrayBuffer.empty[() => Unit]
   def check(): Unit = synchronized {
-    if (cancelled || Thread.currentThread().isInterrupted) throw new InterruptedException("Storage operation interrupted")
+    if (cancelled || Thread.currentThread().isInterrupted)
+      throw new InterruptedException("Storage operation interrupted")
   }
   def onCancel(action: () => Unit): Unit = synchronized {
     if (cancelled) { action(); throw new InterruptedException("Storage operation interrupted") }
@@ -43,40 +53,42 @@ object StorageFailures {
     while (current != null && !result.exists(_ eq current)) { result += current; current = current.getCause }
     result.toVector
   }
+
+  /** Authentication and authorization failures, which no retry can fix. */
   def denied(error: Throwable): Boolean = causes(error).exists {
     case _: AccessDeniedException | _: StorageAccessFailure => true
     case service: AwsServiceException => Set(401, 403).contains(service.statusCode())
     case _ => false
   }
+
+  /** Throttling, server errors, and transport failures. Conflicts and invalid input are permanent. */
   def retryable(error: Throwable): Boolean = {
     val chain = causes(error)
-    if (denied(error) || chain.exists(_.isInstanceOf[IllegalArgumentException]) ||
-      chain.exists(_.isInstanceOf[PublicationConflict]) || chain.exists(_.isInstanceOf[UnstoppedOperation])) false
+    val permanent = chain.exists {
+      case _: IllegalArgumentException | _: PublicationConflict | _: UnstoppedOperation => true
+      case _ => false
+    }
+    if (denied(error) || permanent) false
     else chain.collectFirst { case service: AwsServiceException =>
       service.statusCode() == 429 || service.statusCode() >= 500
-    }.getOrElse(error.isInstanceOf[IOException] || error.isInstanceOf[TimeoutException] || error.isInstanceOf[SdkClientException])
+    }.getOrElse(error.isInstanceOf[IOException] || error.isInstanceOf[TimeoutException] ||
+      error.isInstanceOf[SdkClientException])
   }
 }
 
 /** Deadlines cover the entire operation, including streamed response bodies and stream close. */
 final class StorageOperations(policy: StoragePolicy = StoragePolicy()) {
-  def run[A](operation: OperationScope => A): A = {
-    var attempt = 1
-    while (true) {
-      if (Thread.currentThread().isInterrupted) throw new InterruptedException("Publication interrupted")
-      try return once(operation) catch {
-        case error if StorageFailures.denied(error) => throw new StorageAccessFailure
-        case error if StorageFailures.retryable(error) && attempt < policy.attempts =>
-          Thread.sleep(policy.backoffMillis * attempt)
-          attempt += 1
-      }
-    }
-    throw new IllegalStateException("Unreachable retry state")
-  }
+  /** Runs one operation with a deadline per attempt and bounded retries of transient failures. */
+  def run[A](operation: OperationScope => A): A =
+    try Retry.run(policy.attempts, policy.backoffMillis, "Publication")(StorageFailures.retryable)(
+      once(operation))
+    catch { case error if StorageFailures.denied(error) => throw new StorageAccessFailure }
 
+  /** One attempt on a dedicated thread, cancelled and cleaned up when its deadline expires. */
   private def once[A](operation: OperationScope => A): A = {
     val scope = new OperationScope()
     val finished = new CountDownLatch(1)
+    // LIMIT: one thread per attempt. Fine for a few large objects, costly for thousands of small ones.
     val executor = Executors.newSingleThreadExecutor((task: Runnable) => {
       val thread = new Thread(task, "tlc-storage-operation")
       thread.setDaemon(true)
@@ -90,6 +102,7 @@ final class StorageOperations(policy: StoragePolicy = StoragePolicy()) {
       case timeout: TimeoutException =>
         future.cancel(true)
         scope.cancel()
+        // LIMIT: a cancelled operation gets 5 s to stop. A slower one fails the run without retry.
         if (!finished.await(5, TimeUnit.SECONDS)) throw new UnstoppedOperation
         throw timeout
       case interrupted: InterruptedException =>
@@ -97,24 +110,5 @@ final class StorageOperations(policy: StoragePolicy = StoragePolicy()) {
         scope.cancel()
         throw interrupted
     } finally executor.shutdownNow()
-  }
-}
-
-object StreamDigest {
-  /** One bounded buffer computes the digest while copying or independently reading remote bytes. */
-  def read(input: InputStream, scope: OperationScope, output: Option[OutputStream] = None): (Long, String) = {
-    val digest = MessageDigest.getInstance("SHA-256")
-    val buffer = new Array[Byte](64 * 1024)
-    var total = 0L
-    var count = input.read(buffer)
-    while (count != -1) {
-      scope.check()
-      digest.update(buffer, 0, count)
-      output.foreach(_.write(buffer, 0, count))
-      total += count
-      count = input.read(buffer)
-    }
-    scope.check()
-    (total, digest.digest().map(b => f"${b & 0xff}%02x").mkString)
   }
 }

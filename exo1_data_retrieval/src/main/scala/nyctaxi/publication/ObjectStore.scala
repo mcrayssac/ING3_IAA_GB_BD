@@ -1,9 +1,7 @@
 package nyctaxi.publication
 
 import java.io.{InputStream, OutputStream}
-import java.net.URI
-import java.nio.file.AccessDeniedException
-import java.time.Duration
+import nyctaxi.contract.{StorageKey, StorageLayout}
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path => HadoopPath}
 import software.amazon.awssdk.auth.credentials.{AwsBasicCredentials, StaticCredentialsProvider}
@@ -14,6 +12,13 @@ import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.s3.{S3Client, S3Configuration}
 import software.amazon.awssdk.services.s3.model.{CreateBucketRequest, HeadBucketRequest, S3Exception}
 
+/** Object storage access for publication (interfaces I3 and I11, task M2.3).
+  *
+  * Input: bucket, endpoint, and credentials from `UploadConfig`, and object keys from `StorageLayout`.
+  * Output: bucket creation, object metadata, streaming reads, and conditional creation that never overwrites.
+  * Failure: storage errors propagate without SDK or S3A retries.
+  *   `StorageOperations` owns retries and deadlines.
+  */
 final case class ObjectInfo(bytes: Long, modifiedMillis: Long)
 
 /** Failed copies must abort, never close a partial stream and accidentally commit it. */
@@ -25,9 +30,9 @@ trait ObjectWrite {
 
 trait ObjectStore extends AutoCloseable {
   def ensureBucket(): Unit
-  def stat(key: String): Option[ObjectInfo]
-  def open(key: String): InputStream
-  def create(key: String): ObjectWrite
+  def stat(key: StorageKey): Option[ObjectInfo]
+  def open(key: StorageKey): InputStream
+  def create(key: StorageKey): ObjectWrite
   override def close(): Unit = ()
 }
 
@@ -36,6 +41,7 @@ object S3aObjectStore {
   def settings(config: UploadConfig, policy: StoragePolicy = StoragePolicy()): Map[String, String] = Map(
     "fs.s3a.impl" -> "org.apache.hadoop.fs.s3a.S3AFileSystem",
     "fs.s3a.endpoint" -> config.endpoint.toString,
+    // LIMIT: region fixed to us-east-1, which RustFS accepts. Other AWS regions need a new setting.
     "fs.s3a.endpoint.region" -> "us-east-1",
     "fs.s3a.access.key" -> config.accessKey,
     "fs.s3a.secret.key" -> config.secretKey,
@@ -62,21 +68,26 @@ object S3aObjectStore {
 }
 
 /** Bucket administration uses the existing SDK. Object bytes always travel through S3A. */
-final class S3aObjectStore(config: UploadConfig, policy: StoragePolicy = StoragePolicy()) extends ObjectStore {
+final class S3aObjectStore(config: UploadConfig, policy: StoragePolicy = StoragePolicy())
+  extends ObjectStore {
   private val client = S3Client.builder().endpointOverride(config.endpoint).region(Region.US_EAST_1)
-    .credentialsProvider(StaticCredentialsProvider.create(AwsBasicCredentials.create(config.accessKey, config.secretKey)))
+    .credentialsProvider(StaticCredentialsProvider.create(
+      AwsBasicCredentials.create(config.accessKey, config.secretKey)))
     .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(true).build())
-    .httpClientBuilder(ApacheHttpClient.builder().connectionTimeout(policy.connectTimeout).socketTimeout(policy.operationTimeout))
+    .httpClientBuilder(ApacheHttpClient.builder().connectionTimeout(policy.connectTimeout)
+      .socketTimeout(policy.operationTimeout))
     .overrideConfiguration(ClientOverrideConfiguration.builder().apiCallTimeout(policy.operationTimeout)
-      .apiCallAttemptTimeout(policy.operationTimeout).retryPolicy(RetryPolicy.builder().numRetries(0).build()).build())
+      .apiCallAttemptTimeout(policy.operationTimeout)
+      .retryPolicy(RetryPolicy.builder().numRetries(0).build()).build())
     .build()
-  private val fs = FileSystem.newInstance(URI.create(s"s3a://${config.bucket}"),
+  private val fs = FileSystem.newInstance(StorageLayout.bucketUri(config.bucket),
     S3aObjectStore.configuration(S3aObjectStore.settings(config, policy)))
 
-  private def path(key: String): HadoopPath = new HadoopPath(s"s3a://${config.bucket}/$key")
+  private def path(key: StorageKey): HadoopPath = new HadoopPath(StorageLayout.uri(config.bucket, key))
 
   override def ensureBucket(): Unit = {
     val head = HeadBucketRequest.builder().bucket(config.bucket).build()
+    // LIMIT: a new bucket gets server defaults, without versioning or lifecycle rules.
     try client.headBucket(head) catch {
       case error: S3Exception if error.statusCode() == 404 =>
         try client.createBucket(CreateBucketRequest.builder().bucket(config.bucket).build()) catch {
@@ -86,15 +97,15 @@ final class S3aObjectStore(config: UploadConfig, policy: StoragePolicy = Storage
     }
   }
 
-  override def stat(key: String): Option[ObjectInfo] = try {
+  override def stat(key: StorageKey): Option[ObjectInfo] = try {
     val status = fs.getFileStatus(path(key))
     require(status.isFile, s"Object key denotes a directory: $key")
     Some(ObjectInfo(status.getLen, status.getModificationTime))
   } catch { case _: java.io.FileNotFoundException => None }
 
-  override def open(key: String): InputStream = fs.open(path(key))
+  override def open(key: StorageKey): InputStream = fs.open(path(key))
 
-  override def create(key: String): ObjectWrite = {
+  override def create(key: StorageKey): ObjectWrite = {
     // The builder enables conditional commit, including competing writers that passed HEAD.
     val stream = fs.createFile(path(key)).overwrite(false)
       .opt("fs.s3a.create.performance", true).build()

@@ -1,4 +1,4 @@
-package nyctaxi.retrieval
+package nyctaxi.shared
 
 import com.sun.net.httpserver.{HttpExchange, HttpServer}
 import java.net.{InetSocketAddress, URI}

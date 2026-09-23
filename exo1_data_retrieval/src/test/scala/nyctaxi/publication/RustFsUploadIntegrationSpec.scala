@@ -2,7 +2,8 @@ package nyctaxi.publication
 
 import java.nio.file.Files
 import java.util.UUID
-import nyctaxi.retrieval.{Fixtures, SparkParquetVerifier}
+import nyctaxi.contract.StorageKey
+import nyctaxi.shared.Fixtures
 import org.apache.hadoop.fs.{Path => HadoopPath}
 import org.apache.parquet.hadoop.ParquetFileReader
 import org.apache.parquet.hadoop.util.HadoopInputFile
@@ -43,12 +44,12 @@ class RustFsUploadIntegrationSpec extends AnyFunSuite {
     fixture { (_, store, _) =>
       val publisher = new ObjectPublisher(store, new StorageOperations())
       val payload = Payload.memory(Array[Byte](1, 2, 3))
-      assert(publisher.publish("existing", payload) == "uploaded")
-      val original = store.stat("existing")
-      assert(publisher.publish("existing", payload) == "reused" && store.stat("existing") == original)
-      intercept[PublicationConflict](publisher.publish("existing", Payload.memory(Array[Byte](3, 2, 1))))
+      assert(publisher.publish(StorageKey("existing"), payload) == "uploaded")
+      val original = store.stat(StorageKey("existing"))
+      assert(publisher.publish(StorageKey("existing"), payload) == "reused" && store.stat(StorageKey("existing")) == original)
+      intercept[PublicationConflict](publisher.publish(StorageKey("existing"), Payload.memory(Array[Byte](3, 2, 1))))
       for (blocks <- Vector(1, 70)) {
-        val key = s"race-$blocks"
+        val key = StorageKey(s"race-$blocks")
         // Both streams are opened before either closes, defeating a HEAD-only implementation.
         val first = store.create(key)
         val second = store.create(key)
@@ -67,7 +68,7 @@ class RustFsUploadIntegrationSpec extends AnyFunSuite {
   test("aborting buffered and multipart streams exposes no partial object or pending upload") {
     fixture { (config, store, client) =>
       for (blocks <- Vector(1, 70)) {
-        val key = s"abort-$blocks"
+        val key = StorageKey(s"abort-$blocks")
         val pending = store.create(key)
         val block = new Array[Byte](1024 * 1024)
         try for (_ <- 0 until blocks) pending.output.write(block) finally pending.abort()
@@ -83,8 +84,8 @@ class RustFsUploadIntegrationSpec extends AnyFunSuite {
       val publisher = new ObjectPublisher(store, new StorageOperations())
       val verifier = new SparkRemoteVerifier(config)
       try {
-        publisher.publish("good.parquet", Payload.memory(bytes))
-        val actual = verifier.verify("good.parquet")
+        publisher.publish(StorageKey("good.parquet"), Payload.memory(bytes))
+        val actual = verifier.verify(StorageKey("good.parquet"))
         assert(actual.rowCount == 10 && actual.sparkSchema == expected.sparkSchema && actual.parquetSchema == expected.parquetSchema)
         Fixtures.directory { root =>
           val file = Files.write(root.resolve("fixture.parquet"), bytes)
@@ -92,11 +93,11 @@ class RustFsUploadIntegrationSpec extends AnyFunSuite {
           val chunk = Using.resource(ParquetFileReader.open(input))(_.getFooter.getBlocks.get(0).getColumns.get(1))
           val corrupted = bytes.clone()
           java.util.Arrays.fill(corrupted, chunk.getStartingPos.toInt, (chunk.getStartingPos + chunk.getTotalSize).toInt, 0.toByte)
-          publisher.publish("corrupt.parquet", Payload.memory(corrupted))
+          publisher.publish(StorageKey("corrupt.parquet"), Payload.memory(corrupted))
           val remote = HadoopInputFile.fromPath(new HadoopPath(s"s3a://${config.bucket}/corrupt.parquet"),
             S3aObjectStore.configuration(S3aObjectStore.settings(config)))
           assert(Using.resource(ParquetFileReader.open(remote))(_.getFooter.getBlocks.get(0).getRowCount) == 10)
-          intercept[Exception](verifier.verify("corrupt.parquet"))
+          intercept[Exception](verifier.verify(StorageKey("corrupt.parquet")))
         }
       } finally verifier.close()
     }

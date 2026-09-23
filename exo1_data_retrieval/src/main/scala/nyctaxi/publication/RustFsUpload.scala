@@ -2,6 +2,13 @@ package nyctaxi.publication
 
 import scala.util.control.NonFatal
 
+/** Command entry points of the RustFS publication (interfaces I3 and I11, task M2.3).
+  *
+  * Input: `--help`, positional `[months] [rawDir]` for `upload`, and the process environment.
+  * Output: per-item lines, a summary, and exit status 0 when every source and the receipt are verified.
+  * Failure: exit 2 for invalid configuration, 1 for a failed or denied publication, 130 for interruption.
+  *   Messages are redacted and never contain credentials.
+  */
 object RustFsUpload {
   val help: String = """Usage: upload [months] [rawDir] | --help
     |Alternative: runMain nyctaxi.publication.RustFsUpload [--help]
@@ -38,9 +45,13 @@ object RustFsUpload {
       println(s"Summary: ${report.results.count(_.success)}/${report.results.size} source files verified")
       if (report.success) 0 else 1
     } catch {
-      case _: InterruptedException => Thread.currentThread().interrupt(); System.err.println("Publication interrupted"); 130
+      case _: InterruptedException =>
+        Thread.currentThread().interrupt()
+        System.err.println("Publication interrupted")
+        130
       case NonFatal(error) =>
-        System.err.println("Publication failed: " + config.redact(Option(error.getMessage).getOrElse(error.getClass.getSimpleName)))
+        val message = Option(error.getMessage).getOrElse(error.getClass.getSimpleName)
+        System.err.println("Publication failed: " + config.redact(message))
         1
     } finally {
       try if (verifier != null) verifier.close() finally if (store != null) store.close()
