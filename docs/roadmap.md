@@ -1,6 +1,6 @@
 # Project Roadmap
 
-[![Detailed project Gantt showing 26 tasks across M1–M8 and illustrative dependency steps 00–10. M1 and tasks M1.1, M1.2, M1.3, M2.1, and M2.2 are complete. M2.3, M3.1, and M4.1 are ready to start. Optional extensions and three transversal activities remain on the roadmap.](diagrams/roadmap-gantt.svg)](diagrams/roadmap-gantt.svg)
+[![Detailed project Gantt showing 26 tasks across M1–M8 and illustrative dependency steps 00–10. M1 and tasks M1.1, M1.2, M1.3, M2.1, M2.2, and M2.3 are complete. M2.4, M3.1, and M4.1 are ready to start. Optional extensions and three transversal activities remain on the roadmap.](diagrams/roadmap-gantt.svg)](diagrams/roadmap-gantt.svg)
 
 [Editable Excalidraw source](diagrams/roadmap-gantt.excalidraw).
 
@@ -15,7 +15,7 @@ Build a reproducible pipeline using yellow taxi records for **May, June, and Jul
 The tasks below provide a basis for allocation between both collaborators. Each task has a stable ID, an expected output, and explicit prerequisites. A prerequisite's accepted output must be available before the dependent task can be completed. Planned dates, effort estimates, and owners remain unset.
 
 Status as of **22 September 2026**: **M1 is complete**, and M2.1 source
-identification and M2.2 local retrieval are complete. **M2.3, M3.1, and M4.1
+identification, M2.2 local retrieval, and M2.3 RustFS publication are complete. **M2.4, M3.1, and M4.1
 are ready to start** because their prerequisites are complete. Ready does not
 mean implementation has begun. Completion and readiness labels in the Gantt
 record this status without changing its dependency steps. Other tasks remain
@@ -59,8 +59,8 @@ collision with an unrelated stopped container. The `rustfs` service name and
 network endpoint stayed unchanged. Credentials were kept in an ignored local
 `.env` with owner-only permissions.
 
-Creating the production `nyc-taxi` bucket and publishing source files remain
-M2.3 work. Warehouse tables and Spark JDBC integration belong to later tasks.
+The production bucket and source objects were outside M1.3 verification.
+They were subsequently created and verified in M2.3 on 22 September 2026. Warehouse tables and Spark JDBC integration belong to later tasks.
 
 ### M2. Data Retrieval — Exercise 1
 
@@ -91,9 +91,26 @@ downloading them again. Independent checksum checks confirmed unchanged
 Parquet files and sidecars, including modification times. Existing downloads
 without matching metadata require explicit refresh.
 
-**M2.3 is ready to start.** Publishing trip files and reference snapshots,
-including production bucket creation, remains M2.3 work. All local staging
-files remain ignored by Git. Other operating systems have not been tested.
+**M2.3 is complete.** On **22 September 2026**, the
+[publication workflow](../exo1_data_retrieval/docs/publication.md) created
+`nyc-taxi` and published the three original trip files and the unchanged M2.1
+reference snapshot. Remote SHA-256 checks and full Spark reads passed for
+**11,458,193 rows**, with unchanged monthly schemas. Trip sidecars, the reference
+descriptor, and immutable publication receipts preserve provenance separately
+from raw files.
+
+All **31 ordinary tests** passed twice in fresh sbt processes. All **3 explicit
+RustFS tests** passed, including conditional single and multipart creation,
+competing writers, abort cleanup, and remote corrupt-column rejection. Both
+command entry points verified the real files. Independent hashing confirmed
+unchanged local files and remote accepted objects on reuse, with one new receipt.
+The [source catalog](data-sources.md#verified-rustfs-publication--m23) records
+receipt keys, actual versions, platform, and limitations. RustFS 1.0.0 remains
+running for this project. Other project services were not started for M2.3.
+
+**M2.4 is ready to start.** M2 remains incomplete until direct retrieval is
+implemented and verified. M3.2 still requires the M3.1 data contract. All local
+staging files remain ignored by Git. Other operating systems have not been tested.
 
 ### M3. Data Validation and Cleaning — Exercise 2, Branch 1
 

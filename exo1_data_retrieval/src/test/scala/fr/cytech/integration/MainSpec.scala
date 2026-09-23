@@ -1,6 +1,7 @@
 package fr.cytech.integration
 
 import java.nio.file.Paths
+import nyctaxi.contract.Month
 import nyctaxi.retrieval.{LocalRetrieval, RetrievalConfig}
 import org.scalatest.funsuite.AnyFunSuite
 
@@ -18,9 +19,9 @@ class MainSpec extends AnyFunSuite {
   test("positional values override only supplied environment settings") {
     val env = Map("TAXI_MONTHS" -> "2026-07", "RAW_DIR" -> "data/env", "SPARK_MASTER" -> "local[2]")
     val subset = Main.parse(Array("2026-05"), env, root)
-    assert(subset.months == Vector("2026-05") && subset.rawDir == root.resolve("data/env"))
+    assert(subset.months == Vector(Month("2026-05")) && subset.rawDir == root.resolve("data/env"))
     val overrideBoth = Main.parse(Array("2026-06,2026-05", "data/path with spaces"), env, root)
-    assert(overrideBoth.months == Vector("2026-06", "2026-05"))
+    assert(overrideBoth.months == Vector(Month("2026-06"), Month("2026-05")))
     assert(overrideBoth.rawDir == root.resolve("data/path with spaces") && overrideBoth.master == "local[2]")
     val absolute = root.resolve("data/absolute")
     assert(Main.parse(Array("2026-05", absolute.toString), env, root).rawDir == absolute)

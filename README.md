@@ -7,15 +7,16 @@ a dashboard, and a fare prediction service.
 ## Current Status
 
 The repository contains exercise scaffolding, a pinned Scala toolchain with
-local Spark smoke tests, a verified Docker Compose stack running RustFS,
-PostgreSQL, and a Spark cluster, and the local trip-file retrieval of exercise 1.
+local Spark smoke tests, a verified Docker Compose stack for RustFS,
+PostgreSQL, and a Spark cluster, and local retrieval and RustFS publication for exercise 1.
 The remaining application code and the end-to-end pipeline are not implemented
 yet. Independent UV projects provide pinned Python development
 tools and a verified Marimo smoke notebook. M1.1 development toolchain checks and
 M1.3 infrastructure checks are complete. M2.1 source identification is complete,
-and M2.2 stages and fully verifies the three monthly trip files locally. The
-dictionary, the zone lookup, and the trip files are staged locally, with RustFS
-publication pending M2.3.
+and M2.2 stages and fully verifies the three monthly trip files locally. M2.3
+publishes the trip files, dictionary, zone lookup, and provenance to RustFS,
+with remote checksum checks and full Spark reads. M2.4 direct retrieval is ready
+to start.
 
 ## Project Structure
 
@@ -26,7 +27,7 @@ See the [assignment specification](docs/instructions/instructions.pdf) and
 
 ## Architecture
 
-[![Pipeline architecture showing retrieval into the RustFS data lake, one Spark ingestion job with a cleaned Parquet branch and a PostgreSQL warehouse branch, the dashboard, and the fare prediction service.](docs/diagrams/architecture.svg)](docs/architecture.md)
+[![Pipeline architecture showing verified trip, reference, and provenance publication into RustFS, one Spark ingestion job with cleaned Parquet and PostgreSQL branches, the dashboard, and fare prediction.](docs/diagrams/architecture.svg)](docs/architecture.md)
 
 See the [architecture document](docs/architecture.md) for component responsibilities,
 interfaces, configuration, and design decisions.
@@ -126,8 +127,17 @@ have priority over these environment variables:
 
 See the [retrieval guide](exo1_data_retrieval/README.md) for PowerShell commands,
 local Spark configuration, explicit refresh, recovery, and verification.
-Existing downloads without sidecars require explicit refresh. RustFS publication
-remains M2.3 work.
+Existing downloads without sidecars require explicit refresh. With the project's
+RustFS service running and the cataloged reference files staged locally, publish
+verified sources from inside `exo1_data_retrieval`:
+
+```bash
+sbt --batch 'upload; shutdown'
+```
+
+Matching remote objects are verified and reused. Conflicting objects are never
+overwritten. See the [publication guide](exo1_data_retrieval/docs/publication.md)
+for configuration, provenance, recovery, and RustFS integration tests.
 
 ## Roadmap
 

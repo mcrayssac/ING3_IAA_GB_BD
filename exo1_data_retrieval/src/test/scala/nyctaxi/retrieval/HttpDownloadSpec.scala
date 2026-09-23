@@ -4,6 +4,7 @@ import java.nio.file.Files
 import java.time.Duration
 import java.util.concurrent.{CountDownLatch, TimeUnit, TimeoutException}
 import java.util.concurrent.atomic.AtomicReference
+import nyctaxi.shared.{Digest, Fixtures}
 import org.scalatest.funsuite.AnyFunSuite
 import scala.util.Using
 
@@ -23,7 +24,7 @@ class HttpDownloadSpec extends AnyFunSuite {
         Using.resource(new HttpDownload(fast)) { client =>
           val result = client.fetch(base.resolve("redirect"), dir, "file.parquet")
           assert(Files.readAllBytes(result.path).sameElements(body))
-          assert(result.bytes == body.length && result.sha256 == FileDigest.sha256(result.path))
+          assert(result.bytes == body.length && result.sha256 == Digest.sha256(result.path))
           assert(result.finalUrl == base.resolve("file").toString && requests.get() == 2)
         }
       }

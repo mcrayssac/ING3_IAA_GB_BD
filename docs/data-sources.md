@@ -4,8 +4,9 @@ M2.1 identifies the inputs for yellow taxi trips in **May, June, and July 2026**
 The [official TLC source page](https://www.nyc.gov/site/tlc/about/tlc-trip-record-data.page)
 lists all three monthly files, the yellow-taxi dictionary, and the zone lookup.
 Source checks passed on **2026-09-19**. M2.2 downloaded and fully read the monthly
-files on **2026-09-21**. The reference snapshot remains staged locally.
-**RustFS publication is pending M2.3. M1.3 infrastructure verification is complete.**
+files on **2026-09-21**. M2.3 published and remotely verified the trip files and
+reference snapshot on **2026-09-22**. Local staging remains available.
+**M2.1, M2.2, and M2.3 are complete.**
 
 ## Monthly Trip Files
 
@@ -114,19 +115,71 @@ The directory is relative to the repository root and is ignored by Git:
 data/reference/tlc/20260919T204934Z/
 ```
 
-M2.3 publishes the exact staged files to these future destinations:
+M2.3 published the exact staged files to the destinations selected during M2.1:
 
 ```text
 s3a://nyc-taxi/nyc_reference/tlc/20260919T204934Z/data_dictionary_trip_records_yellow.pdf
 s3a://nyc-taxi/nyc_reference/tlc/20260919T204934Z/taxi_zone_lookup.csv
 ```
 
-The catalog is versioned in Git. The PDF and CSV are not included in a clone,
-and neither RustFS object has been uploaded or verified yet. Until publication,
-retain the staged copies. A fresh download must match the recorded checksum
+The catalog is versioned in Git. The PDF and CSV are not included in a clone.
+Both RustFS objects were uploaded and verified on 2026-09-22. Retain the staged copies. A fresh download must match the recorded checksum
 before it can represent this snapshot. If the source changes, create a new
 timestamped snapshot and update the catalog explicitly. Do not overwrite an
 existing snapshot with different bytes.
+
+## Verified RustFS Publication — M2.3
+
+On **2026-09-22**, `upload` created the `nyc-taxi` bucket and published all five
+source files. Each remote size and independently streamed SHA-256 matched the
+local values recorded above. Spark fully decoded each monthly object through
+S3A, confirming the same schemas and **4,090,836**, **3,837,248**, and
+**3,530,109** rows. No source bytes or schema differences were changed.
+
+Trip objects are at `s3a://nyc-taxi/nyc_raw/<original-filename>`. Reference
+objects remain under `s3a://nyc-taxi/nyc_reference/tlc/20260919T204934Z/`.
+The [reference descriptor](../exo1_data_retrieval/src/main/resources/tlc-reference-snapshot.json)
+records the unchanged M2.1 snapshot in machine-readable form.
+
+The bucket also contains three unchanged trip sidecars under
+`nyc_metadata/tlc/trips/<sidecar-sha256>/<filename>.metadata.json` and the
+reference descriptor at `nyc_metadata/tlc/references/20260919T204934Z.json`.
+These objects keep provenance separate from raw Parquet paths.
+
+The initial and fresh-process verification receipts are:
+
+```text
+s3a://nyc-taxi/nyc_metadata/tlc/publications/20260922T123120Z-06f1c87d-29bd-40ef-96bb-e8a61a9818cc.json
+s3a://nyc-taxi/nyc_metadata/tlc/publications/20260922T123408Z-fd6ae19e-afa4-4f4d-9ef5-0ae35bf1f8ed.json
+```
+
+The first run used `sbt upload`. A fresh `runMain
+nyctaxi.publication.RustFsUpload` process reused all five sources and fully
+reread all three Parquet objects. An independent Python SigV4 reader recomputed
+remote hashes and compared local bytes. Between runs, all nine accepted source
+and provenance objects and the first receipt retained their hashes, lengths,
+ETags, and last-modified values. Only the second receipt was added. All eight
+local source and sidecar files retained their bytes and modification times.
+
+All **31 ordinary Scala tests** passed twice in fresh sbt processes. All
+**3 explicit RustFS integration tests** passed before production publication,
+covering competing single and multipart writes, aborted-upload cleanup, and
+full remote decoding of corrupted column data with a readable footer. The
+integration suite removed its disposable buckets and objects.
+CLI checks also passed for both help commands with invalid environment values,
+invalid-argument exits, positional overrides including a path with spaces, and
+sbt server shutdown after failures.
+
+Verified platform: **macOS 26.5 ARM64**, **JDK 21.0.12**, **Scala 2.13.18**,
+**sbt 2.0.9**, **Spark 4.2.0**, **Hadoop S3A 3.5.0**, and **AWS SDK 2.35.4**.
+The existing RustFS container reports **1.0.0**, Linux x86-64, commit
+`d47f54bfb2f39f48bd1adda334bd27e151fe85b8`. Only this project's RustFS service
+was started for M2.3. It and the published objects remain available. Other
+platforms and storage implementations were not tested.
+
+See the [publication workflow](../exo1_data_retrieval/docs/publication.md) for
+commands, immutable-object conflicts, partial-run recovery, and receipt fields.
+Direct retrieval into RustFS remains M2.4 work.
 
 ## Yellow-Taxi Dictionary
 
@@ -189,6 +242,10 @@ Preserve these special rows exactly as supplied:
 No geographic boundary files are selected in M2.1.
 
 ## Reference and Source Identification Verification — M2.1
+
+[![M2.1 workflow. Manual HEAD checks, reference downloads, PDF and CSV inspection, and SHA-256 recomputation produce the source catalog, the staged reference files, the bundled descriptor, and the Month and StorageLayout contract used by M2.2 and M2.3.](diagrams/m2-1-source-identification.svg)](diagrams/m2-1-source-identification.svg)
+
+[Editable Excalidraw source](diagrams/m2-1-source-identification.excalidraw).
 
 - Checked the official page for the five source links and monthly file selection.
 - Verified HTTP 200 and reported lengths for all three monthly URLs using HEAD.

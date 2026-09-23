@@ -3,7 +3,16 @@
 M2.2 retrieves the original yellow-taxi Parquet files for May–July 2026 into
 repository-root `data/raw/`. HTTP transfer, provenance storage, and local Spark
 verification have separate responsibilities. No Docker services are needed.
-RustFS uploads belong to M2.3 and direct retrieval into RustFS to M2.4.
+[RustFS publication](docs/publication.md) is implemented in M2.3. Direct retrieval
+into RustFS remains M2.4 work.
+
+## Workflow
+
+[![M2.2 workflow. sbt retrieve or runMain LocalRetrieval parses the configuration, locks RAW_DIR, and processes each month. Accepted files are reused after a full Spark read. Other files are downloaded with retries, fully decoded, and promoted with their provenance sidecar. Each month yields an ItemResult, and the run exits with 0, 1, 2, or 130.](../docs/diagrams/m2-2-local-retrieval.svg)](../docs/diagrams/m2-2-local-retrieval.svg)
+
+[Editable Excalidraw source](../docs/diagrams/m2-2-local-retrieval.excalidraw). The
+[M2.1 diagram](../docs/diagrams/m2-1-source-identification.svg) shows where the month
+selection, URLs, and filenames come from.
 
 ## Run
 
@@ -171,3 +180,10 @@ also verified help, positional precedence, nonzero error exits, and refusal to
 reuse files without metadata. See the
 [catalog evidence](../docs/data-sources.md#verified-local-downloads--m22).
 Windows, Linux, and other JDK distributions have not been tested.
+
+On **23 September 2026**, after shared helpers moved to the `nyctaxi.shared` and
+`nyctaxi.contract` packages, the module has **39 ordinary tests**, and all passed
+with JDK 21.0.12. A normal `retrieve` run then reused and fully reread all three
+monthly files (11,458,193 rows) with `local[*]`, leaving data and sidecar bytes and
+modification times unchanged. See the [publication guide](docs/publication.md#tests-and-verified-platform)
+for the publication side of the same refactor.
