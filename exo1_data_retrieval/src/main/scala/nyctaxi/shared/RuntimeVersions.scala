@@ -4,7 +4,10 @@ package nyctaxi.shared
 final case class RuntimeVersions(java: String, scala: String, spark: String)
 
 object RuntimeVersions {
-  /** Versions of the running JVM and of the Spark library on the classpath. */
-  def current: RuntimeVersions = RuntimeVersions(sys.props("java.version"),
-    scala.util.Properties.versionNumberString, org.apache.spark.SPARK_VERSION)
+    /** Versions of the running JVM and of the Spark library on the classpath. */
+    def current: RuntimeVersions = RuntimeVersions(
+        sys.props("java.version"),
+        scala.util.Properties.versionNumberString,
+        org.apache.spark.SPARK_VERSION
+    )
 }

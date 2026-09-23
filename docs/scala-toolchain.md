@@ -132,17 +132,17 @@ and cluster deployment have not been exercised by this verification run.
 ## Troubleshooting
 
 - **Wrong Java version:** stop the module's sbt server, select JDK 21 through
-  `JAVA_HOME`, and rerun the runtime check. Shell `java -version` alone does not
-  prove which JVM an existing sbt server uses.
+    `JAVA_HOME`, and rerun the runtime check. Shell `java -version` alone does not
+    prove which JVM an existing sbt server uses.
 - **Dependency download failure:** check internet access and repository or proxy
-  settings. Keep the committed versions while resolving connectivity issues.
+    settings. Keep the committed versions while resolving connectivity issues.
 - **JVM access errors:** run the documented sbt test command so the forked JVM
-  receives the module options. An IDE or manual Java invocation needs equivalent
-  options and remains outside this terminal workflow.
+    receives the module options. An IDE or manual Java invocation needs equivalent
+    options and remains outside this terminal workflow.
 - **Local socket restrictions:** Spark needs local driver and executor sockets
-  even with `local[2]`. Run the check in an environment allowing loopback sockets.
+    even with `local[2]`. Run the check in an environment allowing loopback sockets.
 - **No tests executed:** use `testFull` and confirm the output reports
-  `ToolchainSpec` and a successful result. The retrieval module has additional tests.
+    `ToolchainSpec` and a successful result. The retrieval module has additional tests.
 
 Generated sbt output and build server metadata are ignored by Git. These checks
 verify the local development toolchain. Cluster deployment, storage connections,

@@ -12,14 +12,16 @@ import scala.util.Using
   *   The OS releases the lock after a crash.
   */
 object RawDirLock {
-  /** Runs `body` while holding the `.retrieval.lock` file lock of RAW_DIR. */
-  def hold[A](rawDir: Path, busyMessage: String)(body: => A): A = {
-    val file = rawDir.resolve(".retrieval.lock")
-    // LIMIT: advisory OS lock on one host. Processes on another machine sharing RAW_DIR are not excluded.
-    Using.resource(FileChannel.open(file, StandardOpenOption.CREATE, StandardOpenOption.WRITE)) { channel =>
-      val lock = channel.tryLock()
-      require(lock != null, busyMessage)
-      try body finally lock.release()
+    /** Runs `body` while holding the `.retrieval.lock` file lock of RAW_DIR. */
+    def hold[A](rawDir: Path, busyMessage: String)(body: => A): A = {
+        val file = rawDir.resolve(".retrieval.lock")
+        // LIMIT: advisory OS lock on one host. Processes on another machine sharing RAW_DIR are not excluded.
+        Using.resource(FileChannel.open(file, StandardOpenOption.CREATE, StandardOpenOption.WRITE)) {
+            channel =>
+                val lock = channel.tryLock()
+                require(lock != null, busyMessage)
+                try body
+                finally lock.release()
+        }
     }
-  }
 }
