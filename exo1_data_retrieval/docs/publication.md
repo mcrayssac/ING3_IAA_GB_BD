@@ -164,6 +164,11 @@ the five real sources, including **11,458,193 trip rows**. Independent readback
 confirmed matching hashes, unchanged accepted remote objects, and unchanged
 local file bytes and timestamps. See the [publication evidence](../../docs/data-sources.md#verified-rustfs-publication--m23).
 
+On **23 September 2026**, after publication was split into named steps and shared
+helpers moved to the `nyctaxi.shared` and `nyctaxi.contract` packages, all
+**39 ordinary tests** and all **3 RustFS integration tests** passed with JDK 21.0.6.
+Object keys, sidecars, and the receipt format are unchanged.
+
 Tested: macOS 26.5 ARM64, JDK 21.0.12, Scala 2.13.18, sbt 2.0.9, Spark 4.2.0,
 Hadoop S3A 3.5.0, AWS SDK 2.35.4, and RustFS 1.0.0 in a Linux x86-64 container.
 Other operating systems and storage implementations have not been tested.
