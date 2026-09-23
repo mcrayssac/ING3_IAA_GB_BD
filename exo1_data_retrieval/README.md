@@ -134,21 +134,21 @@ changed checksums and update the Git-tracked source catalog explicitly.
 ## Recovery
 
 - Downloads from the earlier existence-only workflow have no sidecars. Inspect
-  them, then explicitly refresh to obtain verified file/metadata pairs. No metadata
-  is fabricated for existing bytes.
+    them, then explicitly refresh to obtain verified file/metadata pairs. No metadata
+    is fabricated for existing bytes.
 - A missing sidecar, changed checksum, unsupported metadata version, or incomplete
-  pair fails that month. Inspect the cause before using `--refresh`.
+    pair fails that month. Inspect the cause before using `--refresh`.
 - File and sidecar replacements are individually atomic. A `<filename>.pending`
-  marker detects a crash between replacements, including refreshes with identical
-  content. A subsequent normal run refuses that pair. A successful explicit
-  refresh repairs it and removes the marker.
+    marker detects a crash between replacements, including refreshes with identical
+    content. A subsequent normal run refuses that pair. A successful explicit
+    refresh repairs it and removes the marker.
 - Handled failures remove their temporary files. After a forced process kill,
-  abandoned `.part` files may remain. They are ignored by subsequent runs and can
-  be removed when no retrieval process is running.
+    abandoned `.part` files may remain. They are ignored by subsequent runs and can
+    be removed when no retrieval process is running.
 - An OS file lock prevents concurrent writers to one `RAW_DIR`. The persistent
-  `.retrieval.lock` file is harmless after exit. The OS releases its lock.
+    `.retrieval.lock` file is harmless after exit. The OS releases its lock.
 - Inspect individual month results even when some succeed. The final status is
-  failure if any requested month failed.
+    failure if any requested month failed.
 
 Raw files, sidecars, history, and temporary files under `data/raw/` are ignored.
 They are not included in a clone. The [source catalog](../docs/data-sources.md)

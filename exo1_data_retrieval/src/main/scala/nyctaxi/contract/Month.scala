@@ -7,11 +7,11 @@ package nyctaxi.contract
   * Failure: construction throws `IllegalArgumentException` for text that is not `YYYY-MM`.
   */
 final case class Month(value: String) {
-  require(value.matches("[0-9]{4}-(0[1-9]|1[0-2])"), s"Month must use YYYY-MM: $value")
-  override def toString: String = value
+    require(value.matches("[0-9]{4}-(0[1-9]|1[0-2])"), s"Month must use YYYY-MM: $value")
+    override def toString: String = value
 }
 
 object Month {
-  /** The three months selected in M2.1, in processing order. */
-  val selected: Vector[Month] = Vector("2026-05", "2026-06", "2026-07").map(Month(_))
+    /** The three months selected in M2.1, in processing order. */
+    val selected: Vector[Month] = Vector("2026-05", "2026-06", "2026-07").map(Month(_))
 }

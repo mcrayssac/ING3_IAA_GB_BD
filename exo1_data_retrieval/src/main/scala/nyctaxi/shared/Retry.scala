@@ -8,19 +8,24 @@ package nyctaxi.shared
   *   An interrupted thread stops before the next attempt with `"<context> interrupted"`.
   */
 object Retry {
-  /** Runs `attempt` until it succeeds, fails permanently, or has used all `attempts`. */
-  def run[A](attempts: Int, backoffMillis: Long, context: String, maxBackoffMillis: Long = Long.MaxValue)
-    (retryable: Throwable => Boolean)(attempt: => A): A = {
-    var number = 1
-    while (true) {
-      Interrupts.check(context)
-      try return attempt catch {
-        case error if retryable(error) && number < attempts =>
-          // LIMIT: linear backoff without jitter. Concurrent clients can retry in lockstep.
-          Thread.sleep(math.min(maxBackoffMillis, backoffMillis * number))
-          number += 1
-      }
+    /** Runs `attempt` until it succeeds, fails permanently, or has used all `attempts`. */
+    def run[A](
+        attempts: Int,
+        backoffMillis: Long,
+        context: String,
+        maxBackoffMillis: Long = Long.MaxValue
+    )(retryable: Throwable => Boolean)(attempt: => A): A = {
+        var number = 1
+        while (true) {
+            Interrupts.check(context)
+            try return attempt
+            catch {
+                case error if retryable(error) && number < attempts =>
+                    // LIMIT: linear backoff without jitter. Concurrent clients can retry in lockstep.
+                    Thread.sleep(math.min(maxBackoffMillis, backoffMillis * number))
+                    number += 1
+            }
+        }
+        throw new IllegalStateException("Unreachable retry state")
     }
-    throw new IllegalStateException("Unreachable retry state")
-  }
 }

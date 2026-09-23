@@ -45,13 +45,13 @@ PostgreSQL **18.6**, RustFS **1.0.0**, Spark **4.2.0**, Scala **2.13.18**, and
 Java **21.0.11** inside the Spark containers.
 
 - PostgreSQL accepted the configured password, rejected an incorrect password,
-  and retained a disposable record across a container restart.
+    and retained a disposable record across a container restart.
 - Two Spark workers registered with 2 cores and 2 GB each. The master and both
-  workers resolved and connected to RustFS, PostgreSQL, and the Spark master.
+    workers resolved and connected to RustFS, PostgreSQL, and the Spark master.
 - A job on `spark://spark-master:7077` used the mounted `spark-defaults.conf` to
-  write and read Parquet through S3A in a temporary `m1-smoke-<unique-id>` bucket.
-  It returned **10 rows with a sum of 45**. The test bucket, objects, and database
-  fixture were removed afterward.
+    write and read Parquet through S3A in a temporary `m1-smoke-<unique-id>` bucket.
+    It returned **10 rows with a sum of 45**. The test bucket, objects, and database
+    fixture were removed afterward.
 
 All five project services were running at the end of verification. A temporary
 Compose override changed only this project's RustFS container name to avoid a

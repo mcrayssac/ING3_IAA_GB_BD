@@ -114,26 +114,26 @@ filenames, URLs, sizes, hashes, and dictionary revision.
 ## Reruns and Recovery
 
 - Repeat the command to verify and reuse matching objects. A successful rerun
-  adds one receipt without replacing existing data or provenance.
+    adds one receipt without replacing existing data or provenance.
 - Different remote bytes fail the item. Inspect the conflict and preserve the
-  existing object. This command never repairs conflicts by overwriting or deleting
-  them. A source revision requires a separately agreed storage revision.
+    existing object. This command never repairs conflicts by overwriting or deleting
+    them. A source revision requires a separately agreed storage revision.
 - Missing local metadata or a pending local promotion must be resolved through
-  the [retrieval recovery workflow](../README.md#recovery) before publication.
+    the [retrieval recovery workflow](../README.md#recovery) before publication.
 - A changed reference file cannot represent this snapshot. Restore matching
-  staged bytes or define a new snapshot in a separate task.
+    staged bytes or define a new snapshot in a separate task.
 - Publication is not a transaction across all objects. Successful objects remain
-  after a later failure. A rerun verifies them and can fill missing provenance.
-  A run without a verified receipt is incomplete.
+    after a later failure. A rerun verifies them and can fill missing provenance.
+    A run without a verified receipt is incomplete.
 - Transient storage failures receive three attempts with one- and two-second
-  backoff. Each operation has a five-minute deadline, including streamed bodies,
-  and a 30-second connection timeout. Nested SDK and S3A retries are disabled.
-  A lost write response is reconciled by checking the destination before retrying.
+    backoff. Each operation has a five-minute deadline, including streamed bodies,
+    and a 30-second connection timeout. Nested SDK and S3A retries are disabled.
+    A lost write response is reconciled by checking the destination before retrying.
 - Handled failures and interruption abort incomplete streams. A forced process
-  kill can leave an incomplete multipart upload. Inspect and remove only that
-  abandoned upload when no writer is active. There is no bucket-wide automatic purge.
+    kill can leave an incomplete multipart upload. Inspect and remove only that
+    abandoned upload when no writer is active. There is no bucket-wide automatic purge.
 - Item failures allow later independent files to proceed. Authentication failure
-  and interruption stop the run. Local files and accepted objects are retained.
+    and interruption stop the run. Local files and accepted objects are retained.
 
 Exit codes are 0 for complete success, 1 for publication failure, 2 for invalid
 configuration, and 130 for interruption. sbt can translate child failures to

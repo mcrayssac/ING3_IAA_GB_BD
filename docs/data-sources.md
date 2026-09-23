@@ -209,11 +209,11 @@ is the reference for M3.1, which defines the actual cleaning contract.
 Categorical definitions are in the corresponding rows on page 1:
 
 - `VendorID`: 1 = Creative Mobile Technologies, 2 = Curb Mobility,
-  6 = Myle Technologies, 7 = Helix.
+    6 = Myle Technologies, 7 = Helix.
 - `RatecodeID`: 1 = standard, 2 = JFK, 3 = Newark, 4 = Nassau or Westchester,
-  5 = negotiated, 6 = group, 99 = null/unknown.
+    5 = negotiated, 6 = group, 99 = null/unknown.
 - `payment_type`: 0 = Flex Fare, 1 = credit card, 2 = cash, 3 = no charge,
-  4 = dispute, 5 = unknown, 6 = voided.
+    4 = dispute, 5 = unknown, 6 = voided.
 - `store_and_fwd_flag`: `Y` = buffered before transmission, `N` = not buffered.
 
 These definitions do not prove which values occur in the selected monthly files.

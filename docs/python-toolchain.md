@@ -134,10 +134,10 @@ table above. The pinned UV runner was invoked through `uvx`.
 
 - Both projects passed two pytest checks and Flake8.
 - Marimo validation and HTML export passed. The editor rendered count 10, sum
-  45, and the successful assertions without cell errors.
+    45, and the successful assertions without cell errors.
 - Pyment generated a NumPy-style parameter section without changing its input.
 - Both projects passed again in disposable copies with newly created `.venv`
-  directories. Both lockfiles remained byte-for-byte unchanged.
+    directories. Both lockfiles remained byte-for-byte unchanged.
 - The installed UV 0.12.2 was correctly rejected by the project version guard.
 
 These checks complete M1.1 alongside the recorded Scala verification. Windows
@@ -147,12 +147,12 @@ and Linux were not executed here. Fresh environments reused UV's download cache.
 
 - Wrong UV version: use the pinned installer or the `uvx` command above.
 - Wrong Python: check `.python-version`, remove conflicting `UV_PYTHON` overrides,
-  and recreate the project environment with the documented commands.
+    and recreate the project environment with the documented commands.
 - Stale lockfile: review manifest changes and run `uv lock` only when intentional.
 - Download failures: check network or proxy configuration. Do not disable TLS
-  verification to work around certificate errors.
+    verification to work around certificate errors.
 - Notebook failures: run the export command in a terminal and inspect cell errors.
-  Imports for future notebook features must be declared in the dashboard project.
+    Imports for future notebook features must be declared in the dashboard project.
 
 This setup verifies development tools. Warehouse and RustFS access, dashboard
 features, training, inference, packaging, and CI belong to later work. Training
