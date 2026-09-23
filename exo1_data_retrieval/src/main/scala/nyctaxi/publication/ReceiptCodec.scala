@@ -7,24 +7,27 @@ import java.time.Instant
 import nyctaxi.contract.{Month, StorageKey}
 import nyctaxi.shared.{RuntimeVersions, Verification}
 
+/** Provenance object published next to one accepted source, and how it was accepted. */
+final case class ProvenanceEntry(key: StorageKey, bytes: Long, sha256: String, action: String)
+
+/** One accepted source object, its provenance, and its remote decoding when it is Parquet. */
+final case class ReceiptEntry(
+  key: StorageKey, bytes: Long, sha256: String, action: String, verifiedAt: String,
+  source: JsonNode, provenance: ProvenanceEntry, verification: Option[Verification]
+)
+
+/** Everything recorded about one fully verified publication run. */
+final case class Receipt(
+  bucket: String, endpoint: URI, snapshotId: String, months: Vector[Month], objects: Vector[ReceiptEntry],
+  publicationId: String, completedAt: Instant, versions: RuntimeVersions
+)
+
 /** Publication receipt of a fully verified run, format version 1 (interface I3, task M2.3).
   *
   * Input: a `Receipt` built by `PublicationRunner` from accepted items.
   * Output: pretty-printed JSON. Field names and their order are part of the published format.
   * Failure: none beyond Jackson errors on malformed Spark schema JSON.
   */
-final case class ProvenanceEntry(key: StorageKey, bytes: Long, sha256: String, action: String)
-
-final case class ReceiptEntry(
-  key: StorageKey, bytes: Long, sha256: String, action: String, verifiedAt: String,
-  source: JsonNode, provenance: ProvenanceEntry, verification: Option[Verification]
-)
-
-final case class Receipt(
-  bucket: String, endpoint: URI, snapshotId: String, months: Vector[Month], objects: Vector[ReceiptEntry],
-  publicationId: String, completedAt: Instant, versions: RuntimeVersions
-)
-
 object ReceiptCodec {
   private val mapper = new ObjectMapper()
 

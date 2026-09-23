@@ -11,13 +11,7 @@ import software.amazon.awssdk.awscore.exception.AwsServiceException
 import scala.collection.mutable.ArrayBuffer
 import scala.util.control.NonFatal
 
-/** Deadlines, cancellation, and retries of storage operations (interfaces I3 and I11, task M2.3).
-  *
-  * Input: one storage operation that registers its open resources with an `OperationScope`.
-  * Output: the operation's result, with at most `attempts` tries for transient failures.
-  * Failure: access denial becomes `StorageAccessFailure` immediately. Conflicts and invalid input are never
-  *   retried. A timed-out operation that does not stop throws `UnstoppedOperation`.
-  */
+/** Test-injectable connection timeout, per-attempt deadline, and retry budget of storage operations. */
 final case class StoragePolicy(
   connectTimeout: Duration = Duration.ofSeconds(30), operationTimeout: Duration = Duration.ofMinutes(5),
   attempts: Int = 3, backoffMillis: Long = 1000L
@@ -76,7 +70,14 @@ object StorageFailures {
   }
 }
 
-/** Deadlines cover the entire operation, including streamed response bodies and stream close. */
+/** Deadlines, cancellation, and retries of storage operations (interfaces I3 and I11, task M2.3).
+  * Deadlines cover the entire operation, including streamed response bodies and stream close.
+  *
+  * Input: one storage operation that registers its open resources with an `OperationScope`.
+  * Output: the operation's result, with at most `attempts` tries for transient failures.
+  * Failure: access denial becomes `StorageAccessFailure` immediately. Conflicts and invalid input are never
+  *   retried. A timed-out operation that does not stop throws `UnstoppedOperation`.
+  */
 final class StorageOperations(policy: StoragePolicy = StoragePolicy()) {
   /** Runs one operation with a deadline per attempt and bounded retries of transient failures. */
   def run[A](operation: OperationScope => A): A =

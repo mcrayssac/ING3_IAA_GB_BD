@@ -9,13 +9,7 @@ import nyctaxi.shared.{Digest, ProvenanceFiles, Verification}
 import scala.jdk.CollectionConverters._
 import scala.util.Using
 
-/** Local sources selected for publication (interfaces I2, I3, and I11, task M2.3).
-  *
-  * Input: accepted trip file and sidecar pairs in RAW_DIR, and the staged reference snapshot files.
-  * Output: one deferred `PublicationInput` per source, with its object keys, payloads, and expected decoding.
-  * Failure: loading an input throws when its local bytes or provenance do not match.
-  *   Other inputs are unaffected.
-  */
+/** Bytes to publish, described by their size and SHA-256 and reopenable for each attempt. */
 final case class Payload(bytes: Long, sha256: String, open: () => InputStream)
 
 object Payload {
@@ -31,12 +25,20 @@ object Payload {
   }
 }
 
+/** One source with its object keys, payloads, and the decoding expected from local provenance. */
 final case class PublicationInput(
   key: StorageKey, payload: Payload, source: JsonNode, provenanceKey: StorageKey,
   provenance: Payload, expected: Option[Verification]
 )
 
-/** References are pinned to the M2.1 descriptor, never rediscovered or downloaded during upload. */
+/** Local sources selected for publication (interfaces I2, I3, and I11, task M2.3).
+  * References are pinned to the M2.1 descriptor, never rediscovered or downloaded during upload.
+  *
+  * Input: accepted trip file and sidecar pairs in RAW_DIR, and the staged reference snapshot files.
+  * Output: one deferred `PublicationInput` per source, with its object keys, payloads, and expected decoding.
+  * Failure: loading an input throws when its local bytes or provenance do not match.
+  *   Other inputs are unaffected.
+  */
 final class PublicationInputs(descriptor: Array[Byte] = PublicationInputs.descriptor) {
   private val mapper = new ObjectMapper()
   private val snapshot = mapper.readTree(descriptor)

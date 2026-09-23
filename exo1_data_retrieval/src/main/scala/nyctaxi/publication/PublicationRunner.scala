@@ -8,13 +8,7 @@ import nyctaxi.contract.{StorageKey, StorageLayout}
 import nyctaxi.shared.{Interrupts, ItemResult, RawDirLock, RuntimeVersions, Verification}
 import scala.util.control.NonFatal
 
-/** Publication of verified local sources to RustFS (interfaces I3 and I11, task M2.3).
-  *
-  * Input: accepted file/sidecar pairs in RAW_DIR and the staged reference snapshot.
-  * Output: objects under nyc_raw/, nyc_reference/, and nyc_metadata/ in the bucket, then one receipt.
-  * Failure: items fail independently. The run fails and writes no receipt when any item fails.
-  *   Access denial and interruption stop the whole run.
-  */
+/** Per-source results and, for a fully verified run, the key of its receipt. */
 final case class PublicationReport(results: Vector[ItemResult], receipt: Option[StorageKey]) {
   def success: Boolean = results.forall(_.success) && receipt.nonEmpty
 }
@@ -22,6 +16,13 @@ final case class PublicationReport(results: Vector[ItemResult], receipt: Option[
 /** One processed source: its result and, once accepted, its receipt entry. */
 private final case class PublishedItem(result: ItemResult, entry: Option[ReceiptEntry])
 
+/** Publication of verified local sources to RustFS (interfaces I3 and I11, task M2.3).
+  *
+  * Input: accepted file/sidecar pairs in RAW_DIR and the staged reference snapshot.
+  * Output: objects under nyc_raw/, nyc_reference/, and nyc_metadata/ in the bucket, then one receipt.
+  * Failure: items fail independently. The run fails and writes no receipt when any item fails.
+  *   Access denial and interruption stop the whole run.
+  */
 final class PublicationRunner(
   store: ObjectStore, verifier: RemoteVerifier, inputs: PublicationInputs = new PublicationInputs(),
   policy: StoragePolicy = StoragePolicy(), log: String => Unit = println

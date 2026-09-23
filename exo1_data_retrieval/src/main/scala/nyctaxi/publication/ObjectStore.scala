@@ -12,13 +12,7 @@ import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.s3.{S3Client, S3Configuration}
 import software.amazon.awssdk.services.s3.model.{CreateBucketRequest, HeadBucketRequest, S3Exception}
 
-/** Object storage access for publication (interfaces I3 and I11, task M2.3).
-  *
-  * Input: bucket, endpoint, and credentials from `UploadConfig`, and object keys from `StorageLayout`.
-  * Output: bucket creation, object metadata, streaming reads, and conditional creation that never overwrites.
-  * Failure: storage errors propagate without SDK or S3A retries.
-  *   `StorageOperations` owns retries and deadlines.
-  */
+/** Size and modification time of one existing object. */
 final case class ObjectInfo(bytes: Long, modifiedMillis: Long)
 
 /** Failed copies must abort, never close a partial stream and accidentally commit it. */
@@ -28,6 +22,13 @@ trait ObjectWrite {
   def abort(): Unit
 }
 
+/** Object storage access for publication (interfaces I3 and I11, task M2.3).
+  *
+  * Input: bucket, endpoint, and credentials from `UploadConfig`, and object keys from `StorageLayout`.
+  * Output: bucket creation, object metadata, streaming reads, and conditional creation that never overwrites.
+  * Failure: storage errors propagate without SDK or S3A retries.
+  *   `StorageOperations` owns retries and deadlines.
+  */
 trait ObjectStore extends AutoCloseable {
   def ensureBucket(): Unit
   def stat(key: StorageKey): Option[ObjectInfo]

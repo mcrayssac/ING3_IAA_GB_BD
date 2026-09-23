@@ -172,3 +172,10 @@ also verified help, positional precedence, nonzero error exits, and refusal to
 reuse files without metadata. See the
 [catalog evidence](../docs/data-sources.md#verified-local-downloads--m22).
 Windows, Linux, and other JDK distributions have not been tested.
+
+On **23 September 2026**, after shared helpers moved to the `nyctaxi.shared` and
+`nyctaxi.contract` packages, the module has **39 ordinary tests**, and all passed
+with JDK 21.0.12. A normal `retrieve` run then reused and fully reread all three
+monthly files (11,458,193 rows) with `local[*]`, leaving data and sidecar bytes and
+modification times unchanged. See the [publication guide](docs/publication.md#tests-and-verified-platform)
+for the publication side of the same refactor.

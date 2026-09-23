@@ -166,7 +166,7 @@ local file bytes and timestamps. See the [publication evidence](../../docs/data-
 
 On **23 September 2026**, after publication was split into named steps and shared
 helpers moved to the `nyctaxi.shared` and `nyctaxi.contract` packages, all
-**39 ordinary tests** and all **3 RustFS integration tests** passed with JDK 21.0.6.
+**39 ordinary tests** and all **3 RustFS integration tests** passed with JDK 21.0.12.
 Object keys, sidecars, and the receipt format are unchanged.
 
 Tested: macOS 26.5 ARM64, JDK 21.0.12, Scala 2.13.18, sbt 2.0.9, Spark 4.2.0,
