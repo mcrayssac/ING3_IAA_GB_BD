@@ -3,7 +3,8 @@
 M2.2 retrieves the original yellow-taxi Parquet files for May–July 2026 into
 repository-root `data/raw/`. HTTP transfer, provenance storage, and local Spark
 verification have separate responsibilities. No Docker services are needed.
-RustFS uploads belong to M2.3 and direct retrieval into RustFS to M2.4.
+[RustFS publication](docs/publication.md) is implemented in M2.3. Direct retrieval
+into RustFS remains M2.4 work.
 
 ## Run
 

@@ -36,27 +36,32 @@ object SparkParquetVerifier {
   }
 }
 
-/** Uses a separate local Spark read after HTTP transfer, without transforming source bytes. */
-final class SparkParquetVerifier(master: String) extends ParquetVerifier {
+/** Completely decodes local or S3A sources without transforming their bytes. */
+final class SparkParquetVerifier(master: String, hadoopSettings: Map[String, String] = Map.empty) extends ParquetVerifier {
   private var session: Option[SparkSession] = None
 
   private def spark: SparkSession = session.getOrElse {
-    val created = SparkSession.builder().appName("tlc-local-retrieval").master(master)
+    val builder = SparkSession.builder().appName("tlc-source-verification").master(master)
       .config("spark.ui.enabled", "false")
       .config("spark.driver.host", "127.0.0.1")
       .config("spark.driver.bindAddress", "127.0.0.1")
       .config("spark.sql.files.ignoreCorruptFiles", "false")
       .config("spark.sql.files.ignoreMissingFiles", "false")
       .config("spark.sql.parquet.aggregatePushdown", "false")
-      .getOrCreate()
+    hadoopSettings.foreach { case (key, value) => builder.config("spark.hadoop." + key, value) }
+    val created = builder.getOrCreate()
     created.sparkContext.setLogLevel("WARN")
     session = Some(created)
     created
   }
 
-  override def verify(path: Path): Verification = {
+  override def verify(path: Path): Verification = verify(new HadoopPath(path.toUri))
+
+  /** The same complete projection verifies local files and individual S3A objects. */
+  def verify(path: HadoopPath): Verification = {
     val current = spark
-    val input = HadoopInputFile.fromPath(new HadoopPath(path.toUri), current.sparkContext.hadoopConfiguration)
+    hadoopSettings.foreach { case (key, value) => current.sparkContext.hadoopConfiguration.set(key, value) }
+    val input = HadoopInputFile.fromPath(path, current.sparkContext.hadoopConfiguration)
     val physical = Using.resource(ParquetFileReader.open(input))(_.getFooter.getFileMetaData.getSchema.toString)
     val data = current.read.option("ignoreCorruptFiles", "false").option("ignoreMissingFiles", "false")
       .parquet(path.toUri.toString)

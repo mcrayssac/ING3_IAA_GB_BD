@@ -1,0 +1,21 @@
+{
+  "formatVersion": 1,
+  "snapshotId": "20260919T204934Z",
+  "retrievedAt": "2026-09-19T20:49:35Z",
+  "files": [
+    {
+      "filename": "data_dictionary_trip_records_yellow.pdf",
+      "sourceUrl": "https://www.nyc.gov/assets/tlc/downloads/pdf/data_dictionary_trip_records_yellow.pdf",
+      "bytes": 148556,
+      "sha256": "b9e9f0ecfa6bd9cc847283379173fd764fe1ab76d2fa143329f541cb1f479993",
+      "revision": "March 18, 2025, printed on page 1"
+    },
+    {
+      "filename": "taxi_zone_lookup.csv",
+      "sourceUrl": "https://d37ci6vzurychx.cloudfront.net/misc/taxi_zone_lookup.csv",
+      "bytes": 12331,
+      "sha256": "1a99e105092230f8620f301edcca7f80d3080642ff404d28ed957d3fa222c8ed",
+      "revision": "No embedded revision, identified by retrieval time and checksum"
+    }
+  ]
+}

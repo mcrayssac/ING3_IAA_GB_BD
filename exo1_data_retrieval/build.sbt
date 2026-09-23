@@ -3,6 +3,7 @@ version := "0.1.0-SNAPSHOT"
 scalaVersion := "2.13.18"
 
 val retrieve = inputKey[Unit]("Stage the requested months in the local raw directory.")
+val upload = inputKey[Unit]("Publish verified local sources to RustFS without overwriting objects.")
 
 lazy val root = (project in file("."))
   .settings(
@@ -31,6 +32,21 @@ lazy val root = (project in file("."))
       val arguments = Seq("-cp", classpath, "fr.cytech.integration.Main") ++ requested
       val exitCode = Fork.java(options, arguments)
       if (exitCode != 0) sys.error(s"Retrieval failed with exit code $exitCode")
+    },
+    // Match retrieve's foreground launch, JDK, heap, output, and root-relative paths.
+    upload := {
+      val requested = sbt.complete.DefaultParsers.spaceDelimited("[months] [rawDir] | --help").parsed
+      val converter = fileConverter.value
+      val classpath = (Compile / fullClasspath).value
+        .map(entry => converter.toPath(entry.data).toAbsolutePath.toString)
+        .mkString(java.io.File.pathSeparator)
+      val options = ForkOptions()
+        .withJavaHome(javaHome.value)
+        .withWorkingDirectory(baseDirectory.value.getParentFile)
+        .withRunJVMOptions((Compile / run / javaOptions).value.toVector)
+        .withOutputStrategy(Some(LoggedOutput(streams.value.log)))
+      val code = Fork.java(options, Seq("-cp", classpath, "nyctaxi.publication.UploadMain") ++ requested)
+      if (code != 0) sys.error(s"Upload failed with exit code $code")
     },
     // Keep the test JVM on the JDK selected for sbt through JAVA_HOME.
     javaHome := Some(file(sys.props("java.home"))),

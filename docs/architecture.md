@@ -5,7 +5,7 @@ and the interfaces between components. It is the output of roadmap task M1.2.
 Later tasks fill in the details of each interface. The owner task of each interface is
 named in the [interface table](#interfaces).
 
-[![Architecture diagram. exo1 retrieves the TLC monthly Parquet files into the nyc_raw prefix of the RustFS bucket nyc-taxi, either directly or through local data/raw staging. The exo2 Spark job reads nyc_raw and validates the data once. From the same validated data, branch 1 writes cleaned Parquet to the nyc_cleaned prefix and branch 2 writes to the PostgreSQL warehouse, whose tables are created by the exo3 SQL scripts. The exo4 dashboard reads the warehouse. The exo5 prediction service trains on cleaned Parquet and saves a model artifact that inference loads.](diagrams/architecture.svg)](diagrams/architecture.svg)
+[![Architecture diagram. exo1 publishes local TLC Parquet into nyc_raw, reference snapshots into nyc_reference, and provenance into nyc_metadata in the RustFS bucket nyc-taxi. Direct retrieval remains M2.4. The exo2 Spark job validates once and feeds cleaned Parquet and PostgreSQL branches. The dashboard reads the warehouse, while prediction trains on cleaned files and saves a model artifact.](diagrams/architecture.svg)](diagrams/architecture.svg)
 
 [Editable Excalidraw source](diagrams/architecture.excalidraw).
 
@@ -59,7 +59,7 @@ this table accurate. Consumers depend only on what the interface states.
 |---|---|---|---|
 | I1 | TLC to `exo1` | May, June, and July 2026 files named `yellow_tripdata_YYYY-MM.parquet`. The [source catalog](data-sources.md) records verified URLs, reported sizes, the dictionary, and the zone lookup. | M2.1 |
 | I2 | `exo1` to local disk | Repository-root `data/raw/`, overridable through `RAW_DIR`. Original filenames and bytes, with adjacent version 1 JSON provenance sidecars recording URLs, timestamps, size, SHA-256, schemas, row count, and verification runtimes. Downloads are promoted after a complete local Spark read. Normal reruns verify and reuse matching pairs, while explicit refresh replaces them and retains previous metadata. All staging artifacts are ignored by Git. See the [retrieval workflow](../exo1_data_retrieval/README.md). | M2.2 |
-| I3 | `exo1` to RustFS | Bucket `nyc-taxi`. Trip files at `s3a://nyc-taxi/nyc_raw/yellow_tripdata_YYYY-MM.parquet`, identical to the source. Later stages must not modify them. | M2.3, M2.4 |
+| I3 | `exo1` to RustFS | Bucket `nyc-taxi`. Trip files at `s3a://nyc-taxi/nyc_raw/yellow_tripdata_YYYY-MM.parquet`, identical to verified local sources. Conditional creation prevents overwrites. Uploads and reuse require remote SHA-256 and complete Spark decoding matching local schemas and counts. Versioned provenance and successful-run receipts live under `nyc_metadata/tlc/`. Later stages must not modify accepted objects. | M2.3, M2.4 |
 | I4 | RustFS to `exo2` | `exo2` reads the `nyc_raw/` objects of the requested months. | M3.2 |
 | I5 | `exo2` branch 1 to RustFS | Cleaned Parquet dataset at `s3a://nyc-taxi/nyc_cleaned/yellow_tripdata/`. Column names, types, and validation rules form the cleaned data contract. | M3.1 (contract), M3.3 (output) |
 | I6 | `exo3` to PostgreSQL | Database `nyc_taxi`, schema `dw`. Scripts `exo3_sql_olap/creation.sql` then `exo3_sql_olap/insertion.sql`. Tables and constraints follow the model chosen in M4.1. | M4.2 |
@@ -67,7 +67,7 @@ this table accurate. Consumers depend only on what the interface states.
 | I8 | PostgreSQL to `exo4` | Read-only access to `dw` with the connection settings below. Analytical queries are stored in `exo3_sql_olap/`. | M5.2 (connection), M4.4 (queries) |
 | I9 | RustFS to `exo4` and `exo5` | Read-only access to `nyc_cleaned/` following the I5 contract. | M5.1, M6.1 |
 | I10 | `exo5` training to inference | Training saves the model artifact in `exo5_ml_prediction_service/models/`. The inference script loads it from there. | M6.3 |
-| I11 | Reference staging to RustFS | Original dictionary PDF and zone CSV staged at `data/reference/tlc/<snapshot-id>/`, then published unchanged to `s3a://nyc-taxi/nyc_reference/tlc/<snapshot-id>/` with source filenames. The catalog identifies the snapshot and SHA-256 checksums. Publication is pending. | M2.1 (inventory), M2.3 (publication) |
+| I11 | Reference staging to RustFS | Original dictionary PDF and zone CSV staged at `data/reference/tlc/<snapshot-id>/`, then published unchanged to `s3a://nyc-taxi/nyc_reference/tlc/<snapshot-id>/` with source filenames. The catalog and machine-readable reference descriptor identify the snapshot and SHA-256 checksums. The exact snapshot was published and remotely verified in M2.3. Its descriptor lives under `nyc_metadata/tlc/references/`. | M2.1 (inventory), M2.3 (publication) |
 
 ## Configuration
 
@@ -100,6 +100,23 @@ HTTP transfer, JSON provenance, Spark verification, and command orchestration
 are separate components. The JDK HTTP client downloads candidates, Spark reads
 all columns without transformations, and the provenance store promotes accepted
 file/sidecar pairs. A pending marker detects interrupted promotion.
+
+M2.3 adds `upload [months] [rawDir]` and the environment-based
+`runMain nyctaxi.publication.RustFsUpload` entry point. Both use the same strict
+selection and root-relative staging paths, with `local[2]` as the upload default.
+Each run includes the fixed M2.1 reference snapshot. Neither loads `.env`.
+The existing SDK handles bucket creation, S3A streams unchanged bytes, and the
+shared Spark verifier checks individual remote Parquet objects. HTTP(S) endpoint
+settings use path-style access and signing region `us-east-1`. SDK and S3A retry
+loops are disabled so publication owns the three-attempt policy.
+
+Publication holds the raw-directory lock and accepts only matching local
+provenance. Matching remote objects are verified and reused. Different bytes
+fail without replacement. There is no transaction across objects, so a failed
+run may leave successfully published objects available for a later rerun.
+Only a completely verified run receives a new immutable receipt. The
+[publication guide](../exo1_data_retrieval/docs/publication.md) defines metadata
+keys, receipt fields, failure behavior, and recovery.
 
 The Spark JDBC URL is `jdbc:postgresql://${PG_HOST}:${PG_PORT}/${PG_DATABASE}`.
 A dashboard tool that does not read environment variables uses the same connection values.
@@ -135,7 +152,6 @@ M2.4 and the full reproduction in M8.1. Each owner task implements them, and M8.
 
 These points belong to later tasks and are not resolved here.
 
-- **M2.3** publishes local trip files and the [verified reference snapshot](data-sources.md#reference-snapshot). M1.3 has verified RustFS. Publication remains pending.
 - **M2.4** defines how `exo1` runs in the cluster profile. **M3.2** and **M4.3** do the same for `exo2` and its JDBC driver.
 - **M3.1** defines the cleaned data contract, including partitioning, time handling, and whether rejected records are kept.
 - **M4.1** chooses a star, snowflake, or constellation model and justifies it in the report.
