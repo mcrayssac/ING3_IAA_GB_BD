@@ -94,6 +94,30 @@ Tests use a forked JVM with a 1 GB heap and the JDK 21 module access options fro
 They bind the driver to loopback, disable the Spark web UI, and require no
 RustFS, PostgreSQL, Docker cluster, or downloaded dataset.
 
+## Formatting
+
+Scala sources and `build.sbt` use four-space indentation and lines of at most
+110 characters. Each module's `.scalafmt.conf` pins scalafmt 3.11.5, and the root
+`.editorconfig` applies four-space indentation in editors.
+
+Install the [Coursier](https://get-coursier.io/) launcher, then scalafmt. On macOS:
+
+```bash
+brew install coursier
+coursier install scalafmt
+```
+
+Add the directory printed by the installer to `PATH`. The launcher downloads the
+pinned version on first use. Inside each module:
+
+```bash
+scalafmt
+scalafmt --check
+```
+
+The first command formats tracked Scala and sbt files. The second fails when a file
+is not formatted.
+
 ## Verification Record
 
 Verified on 19 September 2026 using macOS ARM64 and JDK 21.0.12. Both modules

@@ -1,0 +1,10 @@
+root = true
+
+[*]
+indent_style = space
+indent_size = 4
+
+# Generated files, published byte-for-byte artifacts, and supplied course material keep their formatting.
+[{*.excalidraw,*.svg,uv.lock,tlc-reference-snapshot.json,docs/instructions/**}]
+indent_style = unset
+indent_size = unset
